@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and debug files
+*.log
+debug_*.html
+captcha.png
+
+# Output files (will be uploaded to S3, don't need in git)
+trade-book-history-*.csv
+
+# Sensitive files - NEVER COMMIT THESE
+# Credentials should be in GitHub Secrets, not in code
+# But if you have local config files, add them here
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Chrome/Selenium
+chromedriver.exe
+chromedriver
