@@ -1,5 +1,5 @@
-# Use Apify's Python + Chrome base image
-FROM apify/actor-python-chrome:3.11
+# Use Apify's Python + Selenium base image (includes Chrome)
+FROM apify/actor-python-selenium:3.11
 
 # Set working directory
 WORKDIR /usr/src/app
