@@ -56,13 +56,16 @@ async def main():
         # Proxy Setup
         if proxy_config_input:
             print("[DEBUG] Proxy configuration found. Setting up proxy...")
-            proxy_configuration = ProxyConfiguration(actor_proxy_input=proxy_config_input)
-            proxy_url = await proxy_configuration.new_url()
-            if proxy_url:
-                print(f"[DEBUG] Using Proxy: {proxy_url}")
-                chrome_options.add_argument(f'--proxy-server={proxy_url}')
+            proxy_configuration = await Actor.create_proxy_configuration(actor_proxy_input=proxy_config_input)
+            if proxy_configuration:
+                proxy_url = await proxy_configuration.new_url()
+                if proxy_url:
+                    print(f"[DEBUG] Using Proxy: {proxy_url}")
+                    chrome_options.add_argument(f'--proxy-server={proxy_url}')
+                else:
+                     print("[DEBUG] Proxy URL generation failed (None returned). Running without proxy.")
             else:
-                 print("[DEBUG] Proxy URL generation failed (None returned). Running without proxy.")
+                print("[DEBUG] Failed to create proxy configuration.")
         else:
             print("[DEBUG] No proxy configuration provided.")
 
