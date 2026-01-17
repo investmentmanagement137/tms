@@ -1,7 +1,22 @@
 import zipfile
 from urllib.parse import urlparse
+import os
+import sys
+import asyncio
+import json
 
-# ... (imports) ...
+# Add src to path to allow imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from apify import Actor, ProxyConfiguration
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+
+from utils import perform_login
+from tms_client import TMSClient
+
 
 def get_proxy_auth_extension(proxy_url):
     """Creates a Chrome extension to handle proxy authentication."""
