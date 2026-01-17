@@ -59,20 +59,33 @@ def perform_login(driver, username, password, api_key, login_url, cookies=None):
     try:
         # 1. Try Cookie Login if provided
         if cookies:
-            print("[DEBUG] Attempting login with saved cookies...")
+            print(f"[DEBUG] Attempting login with saved cookies ({len(cookies)} cookies)...")
             try:
-                # Must navigate to domain first
-                driver.get(login_url) 
+                # Navigate to base domain first (not /login to avoid fresh cookie conflict)
+                base_url = login_url.replace("/login", "")
+                driver.get(base_url)
+                time.sleep(2)
+                
+                # Clear any existing cookies to avoid conflicts
+                driver.delete_all_cookies()
+                print("[DEBUG] Cleared existing cookies.")
+                
+                # Inject saved cookies
                 for cookie in cookies:
-                    # Selenium expects expiration as 'expiry' (int), sometimes provided as 'expires'
+                    # Selenium expects expiration as 'expiry' (int)
                     if 'expiry' in cookie:
                         cookie['expiry'] = int(cookie['expiry'])
-                    driver.add_cookie(cookie)
+                    try:
+                        driver.add_cookie(cookie)
+                    except Exception as ce:
+                        print(f"[DEBUG] Skipped cookie {cookie.get('name')}: {ce}")
                 
-                print("[DEBUG] Cookies injected. Navigating to Dashboard to verify session...")
+                print(f"[DEBUG] Cookies injected. Navigating to Dashboard to verify session...")
                 dashboard_url = login_url.replace("/login", "/tms/client/dashboard")
                 driver.get(dashboard_url)
                 time.sleep(5)
+                
+                print(f"[DEBUG] Post-cookie navigation URL: {driver.current_url}")
                 
                 if "dashboard" in driver.current_url or "tms/me" in driver.current_url:
                     print("[DEBUG] Cookie Login SUCCESS!")
