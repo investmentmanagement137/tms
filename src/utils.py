@@ -151,6 +151,14 @@ def perform_login(driver, username, password, api_key, login_url):
                                 print(f"[DEBUG] Website Error Message: {error_msg}")
                             except:
                                 print("[DEBUG] No toast error message found.")
+                                
+                            # DUMP PAGE TEXT
+                            try:
+                                body_text = driver.find_element(By.TAG_NAME, "body").text
+                                print(f"[DEBUG] PAGE TEXT DUMP (First 500 chars):\n{body_text[:500]}")
+                            except:
+                                print("[DEBUG] Could not dump page text.")
+                                
                             driver.refresh()
                             time.sleep(2)
                     except Exception as e:
