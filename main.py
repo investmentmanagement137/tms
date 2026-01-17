@@ -2,14 +2,42 @@
 Apify Actor entry point for TMS Trade Book Scraper
 """
 import os
-import sys
+import csv
+import datetime
+import boto3
 from apify import Actor
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-import tms_utils
-from trade_book import scrape_trade_book, upload_to_supabase
+
+# Import from src folder
+from src import utils
+from src import tms_client
+
+
+def upload_to_supabase(csv_filename, endpoint, region, access_key, secret_key, bucket_name):
+    """Upload CSV file to Supabase S3"""
+    try:
+        session = boto3.session.Session()
+        s3 = session.client(
+            's3',
+            region_name=region,
+            endpoint_url=endpoint,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key
+        )
+        
+        print(f"Uploading {csv_filename} to bucket: {bucket_name}")
+        with open(csv_filename, "rb") as f:
+            s3.upload_fileobj(f, bucket_name, csv_filename)
+            
+        print(f"Success! File '{csv_filename}' uploaded successfully.")
+        return True
+        
+    except Exception as e:
+        print(f"Error uploading to Supabase: {e}")
+        return False
 
 
 async def main():
@@ -66,11 +94,11 @@ async def main():
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         try:
-            # Login using tms_utils
+            # Login using utils
             login_url = "https://tms43.nepsetms.com.np/login"
             Actor.log.info('Attempting login to TMS...')
             
-            success = tms_utils.perform_login(
+            success = utils.perform_login(
                 driver, 
                 tms_username, 
                 tms_password, 
@@ -84,55 +112,79 @@ async def main():
             
             Actor.log.info('Login successful!')
             
-            # Set environment variables for trade_book script
-            os.environ['TMS_USERNAME'] = tms_username
-            os.environ['TMS_PASSWORD'] = tms_password
-            os.environ['GEMINI_API_KEY'] = gemini_api_key
-            os.environ['SUPABASE_ENDPOINT'] = supabase_endpoint
-            os.environ['SUPABASE_REGION'] = supabase_region
-            os.environ['SUPABASE_ACCESS_KEY'] = supabase_access_key
-            os.environ['SUPABASE_SECRET_KEY'] = supabase_secret_key
-            os.environ['SUPABASE_BUCKET_NAME'] = supabase_bucket_name
-            
-            # Scrape trade book
+            # Create TMS client for scraping
             Actor.log.info('Starting trade book scraping...')
-            csv_file = scrape_trade_book(driver, days=days_to_scrape)
+            client = tms_client.TMSClient(driver)
             
-            if not csv_file:
-                await Actor.fail('Failed to scrape trade book data')
+            # Convert days to months (approx 30 days per month)
+            months = max(1, days_to_scrape // 30)
+            
+            data = client.extract_tradebook(months=months)
+            
+            if not data or len(data) == 0:
+                await Actor.fail('No trade book data extracted')
                 return
             
-            Actor.log.info(f'Successfully scraped data to {csv_file}')
+            # Save data to CSV
+            today = datetime.date.today()
+            csv_filename = f"trade-book-history-{today}.csv"
+            
+            Actor.log.info(f'Saving data to {csv_filename}...')
+            with open(csv_filename, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                for row in data:
+                    writer.writerow(row)
+            
+            Actor.log.info(f'Successfully saved {len(data)} rows to CSV')
             
             # Save CSV to Apify key-value store
             Actor.log.info('Saving CSV to Apify storage...')
-            await Actor.set_value('OUTPUT', open(csv_file, 'r').read(), content_type='text/csv')
+            with open(csv_filename, 'r') as f:
+                await Actor.set_value('OUTPUT', f.read(), content_type='text/csv')
             
             # Upload to S3 if enabled
             if upload_to_s3 and all([supabase_endpoint, supabase_access_key, supabase_secret_key]):
                 Actor.log.info('Uploading to Supabase S3...')
-                upload_to_supabase(csv_file)
-                Actor.log.info('Upload complete!')
+                success = upload_to_supabase(
+                    csv_filename,
+                    supabase_endpoint,
+                    supabase_region,
+                    supabase_access_key,
+                    supabase_secret_key,
+                    supabase_bucket_name
+                )
+                if success:
+                    Actor.log.info('Upload complete!')
+                else:
+                    Actor.log.warning('S3 upload failed')
             elif upload_to_s3:
                 Actor.log.warning('S3 upload requested but credentials missing - skipping')
             
-            # Parse CSV and push to dataset for easy viewing
-            Actor.log.info('Parsing CSV data for Apify dataset...')
-            import csv
-            with open(csv_file, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
+            # Parse CSV and push to dataset for easy viewing (skip header row)
+            if len(data) > 1:
+                Actor.log.info('Pushing data to Apify dataset...')
+                headers = data[0]
+                rows = data[1:]
                 
-                if rows:
-                    await Actor.push_data(rows)
-                    Actor.log.info(f'Pushed {len(rows)} records to dataset')
+                dict_rows = []
+                for row in rows:
+                    if len(row) == len(headers):
+                        dict_rows.append(dict(zip(headers, row)))
+                
+                if dict_rows:
+                    await Actor.push_data(dict_rows)
+                    Actor.log.info(f'Pushed {len(dict_rows)} records to dataset')
                 else:
-                    Actor.log.warning('No data rows found in CSV')
+                    Actor.log.warning('No valid data rows to push to dataset')
+            else:
+                Actor.log.warning('Only header row found, no data to push')
             
             Actor.log.info('✅ Scraping completed successfully!')
             
         except Exception as e:
             Actor.log.error(f'Error during scraping: {e}')
+            import traceback
+            Actor.log.error(traceback.format_exc())
             await Actor.fail(str(e))
             
         finally:
