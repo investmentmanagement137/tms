@@ -69,8 +69,9 @@ def perform_login(driver, username, password, api_key, login_url, cookies=None):
                         cookie['expiry'] = int(cookie['expiry'])
                     driver.add_cookie(cookie)
                 
-                print("[DEBUG] Cookies injected. Refreshing to verify session...")
-                driver.refresh()
+                print("[DEBUG] Cookies injected. Navigating to Dashboard to verify session...")
+                dashboard_url = login_url.replace("/login", "/tms/client/dashboard")
+                driver.get(dashboard_url)
                 time.sleep(5)
                 
                 if "dashboard" in driver.current_url or "tms/me" in driver.current_url:
