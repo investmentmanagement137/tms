@@ -71,17 +71,6 @@ class TMSClient:
             else:
                  print("[DEBUG] WARNING: Could not find date inputs.")
             
-            # Sets 100 items per page
-            try:
-                print("[DEBUG] Attempting to set 'Items Per Page' to 100...")
-                page_size_select = self.driver.find_element(By.CSS_SELECTOR, "select[aria-label='items per page']")
-                select = Select(page_size_select)
-                select.select_by_value("100")
-                print("[DEBUG] Success: Selected 100 items per page.")
-                time.sleep(2)
-            except Exception as e:
-                print(f"[DEBUG] Could not set 100 items per page: {e}")
-
             # Click Search
             try:
                 print("[DEBUG] Clicking Search Button...")
@@ -135,7 +124,31 @@ class TMSClient:
             except Exception as e:
                 print(f"[DEBUG] Error clicking search: {e}")
             
-            time.sleep(2)
+            time.sleep(5) # Wait for search results to load
+            
+            # Sets 100 items per page (AFTER Search)
+            try:
+                print("[DEBUG] Attempting to set 'Items Per Page' to 100...")
+                page_size_select = self.driver.find_element(By.CSS_SELECTOR, "select[aria-label='items per page']")
+                
+                # Use JS to set value and trigger events
+                js_select = """
+                    arguments[0].value = '100';
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                """
+                self.driver.execute_script(js_select, page_size_select)
+                
+                # Also try standard Select class as backup
+                try:
+                    select = Select(page_size_select)
+                    select.select_by_value("100")
+                except:
+                    pass
+                    
+                print("[DEBUG] Success: Selected 100 items per page.")
+                time.sleep(5) # Wait for grid to reload with 100 items
+            except Exception as e:
+                print(f"[DEBUG] Could not set 100 items per page: {e}")
             
             # Scrape Data
             data = []
