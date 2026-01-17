@@ -59,7 +59,13 @@ class TMSClient:
 
             if start_input and end_input:
                 print("[DEBUG] Setting date values...")
-                js_set = "arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('change'));"
+                # Dispatch both input and change events with bubbling to ensure framework detects change
+                js_set = """
+                    arguments[0].value = arguments[1]; 
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+                """
                 self.driver.execute_script(js_set, start_input, start_str)
                 self.driver.execute_script(js_set, end_input, end_str)
             else:
@@ -79,28 +85,44 @@ class TMSClient:
             # Click Search
             try:
                 print("[DEBUG] Clicking Search Button...")
-                # Try multiple selectors
+                
+                # Wait for button to become enabled (if disabled)
+                time.sleep(2)
+                
+                # Check for Search button
                 selectors = [
-                    (By.XPATH, "//button[contains(text(), 'Search')]"),
-                    (By.CSS_SELECTOR, "button.btn-primary"),
-                    (By.XPATH, "//button[contains(@class, 'btn-primary')]"),
-                    (By.XPATH, "//input[@value='Search']"),
-                    (By.CSS_SELECTOR, "button[type='submit']")
+                    (By.XPATH, "//button[contains(., 'Search')]"),  # Dot matches text in children too
+                    (By.CSS_SELECTOR, "button.export-btn"),          # Class found by inspection
+                    (By.CSS_SELECTOR, "button.k-button-icontext"),
+                    (By.XPATH, "//button[contains(@class, 'export-btn')]"),
+                    (By.CSS_SELECTOR, "button[type='button']")
                 ]
                 
-                search_clicked = False
+                search_btn = None
                 for by, value in selectors:
                     try:
                         btn = self.driver.find_element(by, value)
-                        self.driver.execute_script("arguments[0].click();", btn)
-                        print(f"[DEBUG] Clicked search using {value}")
-                        search_clicked = True
-                        break
+                        if btn.is_displayed():
+                            search_btn = btn
+                            print(f"[DEBUG] Found Search button using {value}")
+                            break
                     except:
                         continue
                 
-                if not search_clicked:
+                if search_btn:
+                    # Check if enabled
+                    is_disabled = search_btn.get_attribute("disabled") or "k-state-disabled" in search_btn.get_attribute("class")
+                    if is_disabled:
+                        print("[DEBUG] Search button is DISABLED. Date inputs might not have triggered.")
+                    
+                    # Force click anyway using JS
+                    self.driver.execute_script("arguments[0].click();", search_btn)
+                    print("[DEBUG] Clicked Search button via JS")
+                    search_clicked = True
+                else:
+                    search_clicked = False
                     print("[DEBUG] Could not find Search button with any selector")
+                    
                     # Capture screenshot of the Trade Book page
                     try:
                         timestamp = int(time.time())
@@ -109,6 +131,7 @@ class TMSClient:
                         print(f"[DEBUG] Saved debug screenshot: {screenshot_name}")
                     except:
                         pass
+                        
             except Exception as e:
                 print(f"[DEBUG] Error clicking search: {e}")
             
