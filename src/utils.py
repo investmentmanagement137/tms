@@ -130,8 +130,8 @@ def perform_login(driver, username, password, api_key, login_url):
                         login_btn.click()
                         
                         # Wait for transition
-                        print("[DEBUG] Waiting for login transition...")
-                        time.sleep(5)
+                        print("[DEBUG] Waiting for login transition (12s)...")
+                        time.sleep(12)
                         print(f"[DEBUG] Post-login URL: {driver.current_url}")
                         
                         if "dashboard" in driver.current_url or "tms/me" in driver.current_url:

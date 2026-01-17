@@ -107,7 +107,7 @@ async def main():
             )
             
             if not success:
-                await Actor.fail('Login failed after maximum attempts')
+                await Actor.fail(status_message='Login failed after maximum attempts')
                 return
             
             Actor.log.info('Login successful!')
@@ -122,7 +122,7 @@ async def main():
             data = client.extract_tradebook(months=months)
             
             if not data or len(data) == 0:
-                await Actor.fail('No trade book data extracted')
+                await Actor.fail(status_message='No trade book data extracted')
                 return
             
             # Save data to CSV
@@ -185,7 +185,7 @@ async def main():
             Actor.log.error(f'Error during scraping: {e}')
             import traceback
             Actor.log.error(traceback.format_exc())
-            await Actor.fail(str(e))
+            await Actor.fail(status_message=str(e))
             
         finally:
             driver.quit()
