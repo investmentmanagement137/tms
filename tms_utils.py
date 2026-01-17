@@ -15,7 +15,7 @@ def get_tms_number(url):
     return "40" # Default
 
 def solve_captcha(driver, api_key):
-    """Solves captcha: Priority 1 (DOM Value), Priority 2 (Gemini API)."""
+    """Solves captcha using Gemini API."""
     import traceback
     
     try:
@@ -23,26 +23,8 @@ def solve_captcha(driver, api_key):
         print("CAPTCHA SOLVING STARTED")
         print("="*50)
         
-        # Strategy 1: Check if value is already in the DOM
-        print("[Strategy 1] Checking DOM for pre-filled CAPTCHA value...")
-        try:
-            captcha_input = driver.find_element(By.ID, "captchaEnter")
-            hidden_value = captcha_input.get_attribute("value")
-            if hidden_value and len(hidden_value) > 2:
-                print(f"✓ [Strategy 1] SUCCESS: Found CAPTCHA in DOM: '{hidden_value}'")
-                print("="*50 + "\n")
-                return hidden_value
-            else:
-                print(f"✗ [Strategy 1] SKIPPED: DOM value empty or too short ('{hidden_value}')")
-        except Exception as e:
-            print(f"✗ [Strategy 1] FAILED: {str(e)}")
-
-        # Strategy 2: Gemini API
-        print("\n[Strategy 2] Proceeding to Gemini API CAPTCHA solving...")
-        print("-"*50)
-        
         # Step 1: Locate CAPTCHA image
-        print("[Step 1/5] Locating CAPTCHA image element...")
+        print("[Step 1/4] Locating CAPTCHA image element...")
         try:
             start_time = time.time()
             captcha_element = WebDriverWait(driver, 5).until(
@@ -55,7 +37,7 @@ def solve_captcha(driver, api_key):
             return None
         
         # Step 2: Capture screenshot
-        print("[Step 2/5] Capturing CAPTCHA screenshot...")
+        print("[Step 2/4] Capturing CAPTCHA screenshot...")
         try:
             start_time = time.time()
             screenshot = captcha_element.screenshot_as_png
@@ -71,7 +53,7 @@ def solve_captcha(driver, api_key):
             return None
         
         # Step 3: Initialize Gemini client
-        print("[Step 3/5] Initializing Gemini API client...")
+        print("[Step 3/4] Initializing Gemini API client...")
         try:
             if not api_key or len(api_key) < 10:
                 print(f"✗ FAILED: Invalid API key (length: {len(api_key) if api_key else 0})")
@@ -88,7 +70,7 @@ def solve_captcha(driver, api_key):
             return None
         
         # Step 4: Send to Gemini API
-        print("[Step 4/5] Sending request to Gemini API...")
+        print("[Step 4/4] Sending request to Gemini API...")
         print(f"   Model: gemini-2.0-flash-exp")
         try:
             start_time = time.time()
@@ -114,7 +96,7 @@ def solve_captcha(driver, api_key):
             return None
         
         # Step 5: Extract and validate result
-        print("[Step 5/5] Extracting CAPTCHA text from response...")
+        print("[Final Step] Extracting CAPTCHA text from response...")
         try:
             captcha_text = response.text.strip()
             
