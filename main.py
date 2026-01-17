@@ -188,6 +188,17 @@ async def main():
             await Actor.fail(status_message=str(e))
             
         finally:
+            # Upload any debug screenshots found
+            import glob
+            screenshots = glob.glob("*.png")
+            for screenshot in screenshots:
+                try:
+                    Actor.log.info(f"Uploading debug screenshot: {screenshot}")
+                    with open(screenshot, 'rb') as f:
+                        await Actor.set_value(screenshot, f.read(), content_type='image/png')
+                except Exception as e:
+                    Actor.log.warning(f"Failed to upload screenshot {screenshot}: {e}")
+
             driver.quit()
             Actor.log.info('Browser closed')
 
