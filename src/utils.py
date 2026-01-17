@@ -124,14 +124,14 @@ def perform_login(driver, username, password, api_key, login_url):
                         captcha_input.clear()
                         captcha_input.send_keys(captcha_text)
                         
-                        # Click Login
-                        print("[DEBUG] Clicking Login Button...")
+                        # Click Login - Javascript Click is more robust in headless
+                        print("[DEBUG] Clicking Login Button (via JS)...")
                         login_btn = driver.find_element(By.CSS_SELECTOR, '.login__button')
-                        login_btn.click()
+                        driver.execute_script("arguments[0].click();", login_btn)
                         
                         # Wait for transition
-                        print("[DEBUG] Waiting for login transition (12s)...")
-                        time.sleep(12)
+                        print("[DEBUG] Waiting for login transition (15s)...")
+                        time.sleep(15)
                         print(f"[DEBUG] Post-login URL: {driver.current_url}")
                         
                         if "dashboard" in driver.current_url or "tms/me" in driver.current_url:
@@ -139,8 +139,14 @@ def perform_login(driver, username, password, api_key, login_url):
                             return True
                         else:
                             print("[DEBUG] Login FAILED (URL did not change).")
+                            # Capture screenshot for debugging
                             try:
-                                # Check for error message
+                                timestamp = int(time.time())
+                                screenshot_name = f"login_failed_{timestamp}.png"
+                                driver.save_screenshot(screenshot_name)
+                                print(f"[DEBUG] Saved debug screenshot: {screenshot_name}")
+                                
+                                # Check for error message again
                                 error_msg = driver.find_element(By.CSS_SELECTOR, ".toast-message").text
                                 print(f"[DEBUG] Website Error Message: {error_msg}")
                             except:
