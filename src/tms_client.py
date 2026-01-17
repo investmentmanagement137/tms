@@ -26,23 +26,7 @@ class TMSClient:
         history_url = f"https://tms{tms_no}.nepsetms.com.np/tms/me/trade-book-history"
         
         print(f"[DEBUG] Navigating to Tradebook History: {history_url}")
-        
-        # Set page load timeout to avoid hanging indefinitely
-        self.driver.set_page_load_timeout(180)
-        
-        max_retries = 3
-        for attempt in range(1, max_retries + 1):
-            try:
-                self.driver.get(history_url)
-                print("[DEBUG] Navigation successful.")
-                break
-            except Exception as e:
-                print(f"[DEBUG] Navigation attempt {attempt} failed: {e}")
-                if attempt == max_retries:
-                     print("CRITICAL: Failed to load Trade Book History page.")
-                     return []
-                time.sleep(5)
-                
+        self.driver.get(history_url)
         time.sleep(3)
         
         try:
@@ -95,13 +79,30 @@ class TMSClient:
             # Click Search
             try:
                 print("[DEBUG] Clicking Search Button...")
-                search_btn = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Search')]")
-                search_btn.click()
-            except:
-                try:
-                    self.driver.find_element(By.CSS_SELECTOR, "button.btn-primary").click()
-                except:
-                    print("[DEBUG] Could not find Search button")
+                # Try multiple selectors
+                selectors = [
+                    (By.XPATH, "//button[contains(text(), 'Search')]"),
+                    (By.CSS_SELECTOR, "button.btn-primary"),
+                    (By.XPATH, "//button[contains(@class, 'btn-primary')]"),
+                    (By.XPATH, "//input[@value='Search']"),
+                    (By.CSS_SELECTOR, "button[type='submit']")
+                ]
+                
+                search_clicked = False
+                for by, value in selectors:
+                    try:
+                        btn = self.driver.find_element(by, value)
+                        self.driver.execute_script("arguments[0].click();", btn)
+                        print(f"[DEBUG] Clicked search using {value}")
+                        search_clicked = True
+                        break
+                    except:
+                        continue
+                
+                if not search_clicked:
+                    print("[DEBUG] Could not find Search button with any selector")
+            except Exception as e:
+                print(f"[DEBUG] Error clicking search: {e}")
             
             time.sleep(2)
             
