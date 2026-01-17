@@ -15,22 +15,9 @@ def get_tms_number(url):
     return "58" # Default to 58 as per current common
 
 def solve_captcha(driver, api_key):
-    """Solves captcha: Priority 1 (DOM Value), Priority 2 (Gemini API)."""
+    """Solves captcha using Gemini API."""
     try:
-        print("Attempting to solve captcha...")
-        
-        # Strategy 1: Check if value is already in the DOM
-        try:
-            captcha_input = driver.find_element(By.ID, "captchaEnter")
-            hidden_value = captcha_input.get_attribute("value")
-            if hidden_value and len(hidden_value) > 2:
-                print(f"Strategy 1 Success: Found captcha value in DOM: '{hidden_value}'")
-                return hidden_value
-        except:
-            pass
-
-        # Strategy 2: Gemini API
-        print("Strategy 1 failed (No value found). Proceeding to Strategy 2 (Gemini API)...")
+        print("Attempting to solve captcha using Gemini API...")
         
         print("Locating captcha image...")
         try:
@@ -38,8 +25,8 @@ def solve_captcha(driver, api_key):
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'img.captcha-image-dimension'))
             )
         except:
-             print("Could not find captcha image element.")
-             return None
+            print("Could not find captcha image element.")
+            return None
         
         print("Capturing captcha screenshot...")
         screenshot = captcha_element.screenshot_as_png
