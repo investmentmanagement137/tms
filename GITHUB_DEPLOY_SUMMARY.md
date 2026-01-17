@@ -77,15 +77,15 @@ apify push
 Go to [Apify Console](https://console.apify.com/) and set:
 
 **Required:**
-- ✅ TMS Username: `Bp480035`
-- ✅ TMS Password: `E3!xdpZ11@@`
-- ✅ Gemini API Key: `AIzaSyC184Uw7BV4-QjCCbSddnIt1i9wn-K2Dbw`
+- ✅ TMS Username: `YOUR_TMS_USERNAME`
+- ✅ TMS Password: `YOUR_TMS_PASSWORD`
+- ✅ Gemini API Key: `YOUR_GEMINI_API_KEY`
 
 **Optional (S3 Upload):**
-- Supabase Endpoint: `https://unbgkfatcaztstordiyt.storage.supabase.co/storage/v1/s3`
+- Supabase Endpoint: `YOUR_SUPABASE_ENDPOINT`
 - Supabase Region: `ap-southeast-1`
-- Supabase Access Key: `20e24ef90a5b78cbe4a72a476affbd49`
-- Supabase Secret Key: `3e72f2bdb31a4abe284acca9ee6ef22e02e9a2c8ed3fb1fdb007127ee8438a21`
+- Supabase Access Key: `YOUR_SUPABASE_ACCESS_KEY`
+- Supabase Secret Key: `YOUR_SUPABASE_SECRET_KEY`
 - Supabase Bucket: `investment_management`
 
 ### 3. Set Up Schedule
@@ -98,6 +98,15 @@ Before market: 0 4 * * 0-4    (9:45 AM NPT / 4:00 AM UTC)
 ```
 
 Market operates Sunday-Thursday.
+
+---
+
+## 🛠️ Recent Fixes (v1.0.3)
+
+- ✅ **Fixed Actor Crash**: Corrected `Actor.fail()` usage to prevent TypeErrors
+- ✅ **Improved Login**: Increased wait time after login click from 5s to 12s
+- ✅ **Fixed Dependencies**: Updated `google-generativeai` package
+- ✅ **Fixed Imports**: Corrected module structure for Apify environment
 
 ---
 
