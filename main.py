@@ -94,23 +94,38 @@ async def main():
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         try:
-            # Login using utils
-            login_url = "https://tms43.nepsetms.com.np/login"
-            Actor.log.info('Attempting login to TMS...')
+            # ---------------------------------------------------------
+            # Session Persistence Logic
+            # ---------------------------------------------------------
+            session_store = await Actor.open_key_value_store("tms-session-store")
+            saved_cookies = await session_store.get_value("COOKIES")
             
+            if saved_cookies:
+                Actor.log.info(f"Found saved session cookies. Attempting to restore session...")
+            else:
+                Actor.log.info("No saved session found. Proceeding with fresh login.")
+
+            # Login using utils (with cookie support)
+            login_url = "https://tms43.nepsetms.com.np/login"
             success = utils.perform_login(
                 driver, 
                 tms_username, 
                 tms_password, 
                 gemini_api_key, 
-                login_url
+                login_url,
+                cookies=saved_cookies
             )
             
             if not success:
                 await Actor.fail(status_message='Login failed after maximum attempts')
                 return
             
-            Actor.log.info('Login successful!')
+            # Save cookies for next time
+            new_cookies = driver.get_cookies()
+            await session_store.set_value("COOKIES", new_cookies)
+            Actor.log.info('Login successful! Session cookies saved for next run.')
+            
+            # ---------------------------------------------------------
             
             # Create TMS client for scraping
             Actor.log.info('Starting trade book scraping...')
