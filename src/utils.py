@@ -5,7 +5,7 @@ from PIL import Image
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from google import genai
+import google.generativeai as genai
 
 def get_tms_number(url):
     """Extracts the TMS number from the URL."""
@@ -46,14 +46,14 @@ def solve_captcha(driver, api_key):
         image = Image.open(io.BytesIO(screenshot))
         
         print("Sending to Gemini API...")
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=[
-                "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.", 
-                image
-            ]
-        )
+        print("[DEBUG] Sending to Gemini API...")
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        
+        response = model.generate_content([
+            "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.", 
+            image
+        ])
         
         captcha_text = response.text.strip()
         print(f"Gemini solved captcha: '{captcha_text}'")
