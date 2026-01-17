@@ -1,28 +1,82 @@
-import os
-import sys
-import asyncio
-import json
+import zipfile
+from urllib.parse import urlparse
 
-# Add src to path to allow imports
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# ... (imports) ...
 
-from apify import Actor, ProxyConfiguration
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+def get_proxy_auth_extension(proxy_url):
+    """Creates a Chrome extension to handle proxy authentication."""
+    parsed = urlparse(proxy_url)
+    host = parsed.hostname
+    port = parsed.port
+    user = parsed.username
+    password = parsed.password
 
-from utils import perform_login
-from tms_client import TMSClient
+    manifest_json = """
+    {
+        "version": "1.0.0",
+        "manifest_version": 2,
+        "name": "Chrome Proxy",
+        "permissions": [
+            "proxy",
+            "tabs",
+            "unlimitedStorage",
+            "storage",
+            "<all_urls>",
+            "webRequest",
+            "webRequestBlocking"
+        ],
+        "background": {
+            "scripts": ["background.js"]
+        },
+        "minimum_chrome_version":"22.0.0"
+    }
+    """
+
+    background_js = """
+    var config = {
+            mode: "fixed_servers",
+            rules: {
+              singleProxy: {
+                scheme: "http",
+                host: "%s",
+                port: parseInt(%s)
+              },
+              bypassList: ["localhost"]
+            }
+          };
+
+    chrome.proxy.settings.set({value: config, scope: "regular"}, function() {});
+
+    function callbackFn(details) {
+        return {
+            authCredentials: {
+                username: "%s",
+                password: "%s"
+            }
+        };
+    }
+
+    chrome.webRequest.onAuthRequired.addListener(
+                callbackFn,
+                {urls: ["<all_urls>"]},
+                ['blocking']
+    );
+    """ % (host, port, user, password)
+
+    plugin_file = 'proxy_auth_plugin.zip'
+    with zipfile.ZipFile(plugin_file, 'w') as zp:
+        zp.writestr("manifest.json", manifest_json)
+        zp.writestr("background.js", background_js)
+    
+    return plugin_file
 
 async def main():
     async with Actor:
         print("Actor Starting...")
         
-        # 1. Get Input
+        # ... (Inputs) ...
+        # (Copy previous input logic here - abbreviated for brevity in replacement)
         actor_input = await Actor.get_input() or {}
-        
-        # Environment variables as fallback
         tms_website_url = actor_input.get('tmsWebsiteUrl', os.environ.get('TMS_WEBSITE_URL', 'https://tms58.nepsetms.com.np/login'))
         tms_login_id = actor_input.get('tmsLoginId', os.environ.get('TMS_LOGIN_ID'))
         tms_password = actor_input.get('tmsPassword', os.environ.get('TMS_PASSWORD'))
@@ -48,7 +102,11 @@ async def main():
         # 2. Setup Selenium & Proxy
         chrome_options = Options()
         if is_headless:
-            chrome_options.add_argument("--headless")
+            # Note: Extension support in Headless mode can be tricky. 
+            # Standard 'headless' might not support extensions.
+            # 'headless=new' is recommended for newer Chrome versions logic.
+            chrome_options.add_argument("--headless=new") 
+        
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
@@ -60,8 +118,20 @@ async def main():
             if proxy_configuration:
                 proxy_url = await proxy_configuration.new_url()
                 if proxy_url:
-                    print(f"[DEBUG] Using Proxy: {proxy_url}")
-                    chrome_options.add_argument(f'--proxy-server={proxy_url}')
+                    print(f"[DEBUG] Generated Proxy URL: {proxy_url}")
+                    # Check for auth
+                    parsed = urlparse(proxy_url)
+                    if parsed.username and parsed.password:
+                         print("[DEBUG] Authenticated Proxy detected. Injecting helper extension...")
+                         try:
+                             extension_path = get_proxy_auth_extension(proxy_url)
+                             chrome_options.add_extension(extension_path)
+                         except Exception as ext_err:
+                             print(f"[DEBUG] Failed to create proxy extension: {ext_err}. Fallback to arg...")
+                             chrome_options.add_argument(f'--proxy-server={proxy_url}')
+                    else:
+                         print("[DEBUG] Non-authenticated proxy. Using standard arg.")
+                         chrome_options.add_argument(f'--proxy-server={proxy_url}')
                 else:
                      print("[DEBUG] Proxy URL generation failed (None returned). Running without proxy.")
             else:
@@ -70,6 +140,7 @@ async def main():
             print("[DEBUG] No proxy configuration provided.")
 
         print("Launching Chrome...")
+        # ... (Driver init) ...
         try:
              service = Service(ChromeDriverManager().install())
              driver = webdriver.Chrome(service=service, options=chrome_options)
