@@ -16,21 +16,21 @@ import tms_utils
 print("DEBUG: All imports done.")
 
 # --- CONFIGURATION ---
-# These values can be overridden by environment variables (for GitHub Actions)
-# For local use, you can set them directly below or create a .env file
+# These values MUST be set via environment variables or Apify Actor inputs
+# DO NOT hardcode credentials here!
 
-USERNAME = os.environ.get("TMS_USERNAME", "Bp480035")
-PASSWORD = os.environ.get("TMS_PASSWORD", "E3!xdpZ11@@")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyC184Uw7BV4-QjCCbSddnIt1i9wn-K2Dbw")
+USERNAME = os.environ.get("TMS_USERNAME", "")
+PASSWORD = os.environ.get("TMS_PASSWORD", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 HEADLESS = os.environ.get("HEADLESS", "false").lower() == "true"
 
 LOGIN_URL = "https://tms43.nepsetms.com.np/login"
 
 # --- SUPABASE S3 CONFIGURATION ---
-SUPABASE_ENDPOINT = os.environ.get("SUPABASE_ENDPOINT", "https://unbgkfatcaztstordiyt.storage.supabase.co/storage/v1/s3")
+SUPABASE_ENDPOINT = os.environ.get("SUPABASE_ENDPOINT", "")
 SUPABASE_REGION = os.environ.get("SUPABASE_REGION", "ap-southeast-1")
-SUPABASE_ACCESS_KEY = os.environ.get("SUPABASE_ACCESS_KEY", "20e24ef90a5b78cbe4a72a476affbd49")
-SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "3e72f2bdb31a4abe284acca9ee6ef22e02e9a2c8ed3fb1fdb007127ee8438a21")
+SUPABASE_ACCESS_KEY = os.environ.get("SUPABASE_ACCESS_KEY", "")
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
 SUPABASE_BUCKET_NAME = os.environ.get("SUPABASE_BUCKET_NAME", "investment_management")
 
 def upload_to_supabase(file_path):
@@ -61,7 +61,7 @@ def upload_to_supabase(file_path):
     except Exception as e:
         print(f"Error uploading to Supabase: {e}")
 
-def scrape_trade_book(driver):
+def scrape_trade_book(driver, days=365):
     print("\n" + "="*30)
     print("STARTING TRADE BOOK SCRAPING")
     print("="*30)
@@ -96,7 +96,7 @@ def scrape_trade_book(driver):
     try:
         # Date Selection
         today = datetime.date.today()
-        start_date = today - datetime.timedelta(days=365)
+        start_date = today - datetime.timedelta(days=days)
         
         start_str = start_date.strftime("%Y-%m-%d")
         end_str = today.strftime("%Y-%m-%d")

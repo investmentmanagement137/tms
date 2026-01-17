@@ -1,0 +1,40 @@
+{
+  "actorSpecification": 1,
+  "name": "tms-trade-book-scraper",
+  "title": "TMS Trade Book History Scraper",
+  "description": "Automated scraper for NEPSE TMS (Trade Management System) Trade Book History with Supabase S3 upload. Uses Gemini AI for CAPTCHA solving.",
+  "version": "1.0.0",
+  "meta": {
+    "templateId": "python-chrome"
+  },
+  "input": "./input_schema.json",
+  "dockerfile": "./Dockerfile",
+  "readme": "./APIFY_README.md",
+  "storages": {
+    "dataset": {
+      "actorSpecification": 1,
+      "title": "Trade Book History",
+      "views": {
+        "overview": {
+          "title": "Overview",
+          "transformation": {
+            "fields": [
+              "date",
+              "symbol",
+              "quantity",
+              "rate",
+              "amount"
+            ]
+          },
+          "display": {
+            "component": "table",
+            "properties": {}
+          }
+        }
+      }
+    }
+  },
+  "environmentVariables": {
+    "APIFY_HEADLESS": "1"
+  }
+}

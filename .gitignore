@@ -1,36 +1,53 @@
+# Add .actor/INPUT.json to gitignore (contains sensitive credentials)
+.actor/INPUT.json
+.actor/.actor-*.json
+
+# Apify local storage
+apify_storage/
+storage/
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+env/
 venv/
 ENV/
-env/
-.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# Logs and debug files
+# Logs
 *.log
-debug_*.html
+debug_log.txt
+run_log.txt
+
+# Output files
+*.csv
+*.html
 captcha.png
 
-# Output files (will be uploaded to S3, don't need in git)
-trade-book-history-*.csv
-
-# Sensitive files - NEVER COMMIT THESE
-# Credentials should be in GitHub Secrets, not in code
-# But if you have local config files, add them here
-
-# OS files
+# OS
 .DS_Store
 Thumbs.db
-
-# Chrome/Selenium
-chromedriver.exe
-chromedriver

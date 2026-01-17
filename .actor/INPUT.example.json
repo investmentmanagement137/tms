@@ -1,0 +1,12 @@
+{
+    "tmsUsername": "YOUR_USERNAME",
+    "tmsPassword": "YOUR_PASSWORD",
+    "geminiApiKey": "YOUR_GEMINI_API_KEY",
+    "supabaseEndpoint": "https://xxx.storage.supabase.co/storage/v1/s3",
+    "supabaseRegion": "ap-southeast-1",
+    "supabaseAccessKey": "YOUR_ACCESS_KEY",
+    "supabaseSecretKey": "YOUR_SECRET_KEY",
+    "supabaseBucketName": "investment_management",
+    "daysToScrape": 365,
+    "uploadToS3": true
+}
