@@ -122,8 +122,14 @@ async def main():
             
             # Save cookies for next time
             new_cookies = driver.get_cookies()
+            
+            # Debug: Log all cookie names and properties
+            Actor.log.info(f'Captured {len(new_cookies)} cookies after login:')
+            for c in new_cookies:
+                Actor.log.info(f"  - {c['name']}: domain={c.get('domain')}, httpOnly={c.get('httpOnly')}, secure={c.get('secure')}")
+            
             await session_store.set_value("COOKIES", new_cookies)
-            Actor.log.info('Login successful! Session cookies saved for next run.')
+            Actor.log.info('Session cookies saved for next run.')
             
             # ---------------------------------------------------------
             
