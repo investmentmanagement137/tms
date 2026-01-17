@@ -185,10 +185,8 @@ async def main():
             Actor.log.error(f'Error during scraping: {e}')
             import traceback
             Actor.log.error(traceback.format_exc())
-            await Actor.fail(status_message=str(e))
             
-        finally:
-            # Upload any debug screenshots found
+            # Upload any debug screenshots found (BEFORE failing)
             import glob
             screenshots = glob.glob("*.png")
             for screenshot in screenshots:
@@ -196,9 +194,12 @@ async def main():
                     Actor.log.info(f"Uploading debug screenshot: {screenshot}")
                     with open(screenshot, 'rb') as f:
                         await Actor.set_value(screenshot, f.read(), content_type='image/png')
-                except Exception as e:
-                    Actor.log.warning(f"Failed to upload screenshot {screenshot}: {e}")
-
+                except Exception as ex:
+                    Actor.log.warning(f"Failed to upload screenshot {screenshot}: {ex}")
+            
+            await Actor.fail(status_message=str(e))
+            
+        finally:
             driver.quit()
             Actor.log.info('Browser closed')
 
