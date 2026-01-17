@@ -125,28 +125,40 @@ async def main():
                 await Actor.fail(status_message='No trade book data extracted')
                 return
             
-            # Save data to CSV
+            # Parse data into list of dicts
+            json_data = []
+            if len(data) > 1:
+                headers = data[0]
+                rows = data[1:]
+                for row in rows:
+                    if len(row) == len(headers):
+                        json_data.append(dict(zip(headers, row)))
+            
+            if not json_data:
+                await Actor.fail(status_message='No trade book data to save (empty or header only)')
+                return
+
+            # Save data to JSON
             today = datetime.date.today()
-            csv_filename = f"trade-book-history-{today}.csv"
+            json_filename = f"trade-book-history-{today}.json"
             
-            Actor.log.info(f'Saving data to {csv_filename}...')
-            with open(csv_filename, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                for row in data:
-                    writer.writerow(row)
+            import json
+            Actor.log.info(f'Saving formatted JSON to {json_filename}...')
+            with open(json_filename, 'w', encoding='utf-8') as f:
+                json.dump(json_data, f, indent=4, ensure_ascii=False)
             
-            Actor.log.info(f'Successfully saved {len(data)} rows to CSV')
+            Actor.log.info(f'Successfully saved {len(json_data)} records to JSON')
             
-            # Save CSV to Apify key-value store
-            Actor.log.info('Saving CSV to Apify storage...')
-            with open(csv_filename, 'r') as f:
-                await Actor.set_value('OUTPUT', f.read(), content_type='text/csv')
+            # Save JSON to Apify key-value store
+            Actor.log.info('Saving JSON to Apify storage...')
+            with open(json_filename, 'r', encoding='utf-8') as f:
+                await Actor.set_value('OUTPUT', f.read(), content_type='application/json')
             
             # Upload to S3 if enabled
             if upload_to_s3 and all([supabase_endpoint, supabase_access_key, supabase_secret_key]):
-                Actor.log.info('Uploading to Supabase S3...')
+                Actor.log.info('Uploading JSON to Supabase S3...')
                 success = upload_to_supabase(
-                    csv_filename,
+                    json_filename,
                     supabase_endpoint,
                     supabase_region,
                     supabase_access_key,
@@ -160,24 +172,10 @@ async def main():
             elif upload_to_s3:
                 Actor.log.warning('S3 upload requested but credentials missing - skipping')
             
-            # Parse CSV and push to dataset for easy viewing (skip header row)
-            if len(data) > 1:
-                Actor.log.info('Pushing data to Apify dataset...')
-                headers = data[0]
-                rows = data[1:]
-                
-                dict_rows = []
-                for row in rows:
-                    if len(row) == len(headers):
-                        dict_rows.append(dict(zip(headers, row)))
-                
-                if dict_rows:
-                    await Actor.push_data(dict_rows)
-                    Actor.log.info(f'Pushed {len(dict_rows)} records to dataset')
-                else:
-                    Actor.log.warning('No valid data rows to push to dataset')
-            else:
-                Actor.log.warning('Only header row found, no data to push')
+            # Push to dataset as well (Apify handles formatting there too)
+            Actor.log.info('Pushing data to Apify dataset...')
+            await Actor.push_data(json_data)
+            Actor.log.info(f'Pushed {len(json_data)} records to dataset')
             
             Actor.log.info('✅ Scraping completed successfully!')
             
