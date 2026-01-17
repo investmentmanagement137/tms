@@ -97,7 +97,7 @@ async def main():
             # ---------------------------------------------------------
             # Session Persistence Logic
             # ---------------------------------------------------------
-            session_store = await Actor.open_key_value_store("tms-session-store")
+            session_store = await Actor.open_key_value_store(name="tms-session-store")
             saved_cookies = await session_store.get_value("COOKIES")
             
             if saved_cookies:
