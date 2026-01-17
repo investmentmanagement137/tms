@@ -101,6 +101,14 @@ class TMSClient:
                 
                 if not search_clicked:
                     print("[DEBUG] Could not find Search button with any selector")
+                    # Capture screenshot of the Trade Book page
+                    try:
+                        timestamp = int(time.time())
+                        screenshot_name = f"search_btn_missing_{timestamp}.png"
+                        self.driver.save_screenshot(screenshot_name)
+                        print(f"[DEBUG] Saved debug screenshot: {screenshot_name}")
+                    except:
+                        pass
             except Exception as e:
                 print(f"[DEBUG] Error clicking search: {e}")
             
