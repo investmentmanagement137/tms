@@ -69,15 +69,16 @@ def perform_login(driver, username, password, api_key, login_url):
     Returns True if login is successful, False otherwise.
     """
     try:
+        print(f"[DEBUG] Checking if navigation needed. Current URL: {driver.current_url}")
         if driver.current_url == "data:," or "nepsetms" not in driver.current_url:
-             print(f"Navigating to {login_url}...")
+             print(f"[DEBUG] Navigating to {login_url}...")
              try:
                  driver.get(login_url)
+                 print(f"[DEBUG] Navigation successful. Page title: {driver.title}")
              except Exception as nav_error:
                  if "ERR_NAME_NOT_RESOLVED" in str(nav_error) or "ERR_CONNECTION_REFUSED" in str(nav_error):
                      print(f"\nCRITICAL ERROR: Could not connect to {login_url}")
-                     print("Please check your 'TMS Website No' configuration.")
-                     print("Examples: 49, 58, 34, etc.")
+                     print("Please check your 'TMS Website URL' configuration.")
                  raise nav_error
         
         wait = WebDriverWait(driver, 10)
@@ -90,65 +91,73 @@ def perform_login(driver, username, password, api_key, login_url):
             try:
                 # Check where we are
                 if "dashboard" in driver.current_url:
-                    print("Already logged in.")
+                    print("[DEBUG] Already logged in (dashboard found).")
                     return True
                 
                 # Fill Credentials
                 try:
+                    print("[DEBUG] Locating username field...")
                     username_field = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input[placeholder="Client Code/ User Name"]')))
                     username_field.clear()
+                    print(f"[DEBUG] Inputting username: {username}")
                     username_field.send_keys(username)
                     
+                    print("[DEBUG] Locating password field...")
                     password_field = driver.find_element(By.CSS_SELECTOR, '#password-field')
                     password_field.clear()
+                    print("[DEBUG] Inputting password (masked)...")
                     password_field.send_keys(password)
-                except:
-                    print("Could not find login fields (maybe reloading?). Refreshing...")
+                except Exception as field_err:
+                    print(f"[DEBUG] Failed to find login fields: {field_err}. Refreshing page...")
                     driver.refresh()
                     time.sleep(2)
                     continue
 
                 # Solve Captcha
+                print("[DEBUG] Initiating Captcha Solver...")
                 captcha_text = solve_captcha(driver, api_key)
                 
                 if captcha_text:
                     try:
-                        print(f"Filling Captcha: {captcha_text}")
+                        print(f"[DEBUG] Filling Captcha Input with: '{captcha_text}'")
                         captcha_input = driver.find_element(By.ID, "captchaEnter")
                         captcha_input.clear()
                         captcha_input.send_keys(captcha_text)
                         
                         # Click Login
-                        print("Clicking Login...")
+                        print("[DEBUG] Clicking Login Button...")
                         login_btn = driver.find_element(By.CSS_SELECTOR, '.login__button')
                         login_btn.click()
                         
                         # Wait for transition
+                        print("[DEBUG] Waiting for login transition...")
                         time.sleep(5)
+                        print(f"[DEBUG] Post-login URL: {driver.current_url}")
+                        
                         if "dashboard" in driver.current_url or "tms/me" in driver.current_url:
-                            print("Login successful!")
+                            print("[DEBUG] Login SUCCESS verified via URL match!")
                             return True
                         else:
-                            print("Login failed (URL did not change). Captcha might be wrong.")
+                            print("[DEBUG] Login FAILED (URL did not change).")
                             try:
                                 # Check for error message
                                 error_msg = driver.find_element(By.CSS_SELECTOR, ".toast-message").text
-                                print(f"Error Message: {error_msg}")
+                                print(f"[DEBUG] Website Error Message: {error_msg}")
                             except:
-                                pass
+                                print("[DEBUG] No toast error message found.")
                             driver.refresh()
                             time.sleep(2)
                     except Exception as e:
-                         print(f"Error interacting with login form: {e}")
+                         print(f"[DEBUG] Error interacting with login form: {e}")
                          driver.refresh()
                          time.sleep(2)
                 else:
-                    print("Captcha solve failed.")
+                    print("[DEBUG] Captcha solve returned None. Refreshing...")
                     driver.refresh()
                     time.sleep(2)
                     
             except Exception as e:
-                print(f"Error during login attempt {attempt}: {e}")
+                print(f"[DEBUG] Exception during login attempt {attempt}: {e}")
                 driver.refresh()
                 time.sleep(2)
                 

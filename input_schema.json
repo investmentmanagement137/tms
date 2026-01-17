@@ -43,6 +43,14 @@
             ],
             "default": "EXTRACT_TRADEBOOK"
         },
+        "historyDurationMonths": {
+            "title": "History Duration (Months)",
+            "type": "integer",
+            "description": "Number of months to scrape trade history for (e.g. 1, 12, 60).",
+            "editor": "number",
+            "default": 12,
+            "minimum": 1
+        },
         "orderDetails": {
             "title": "Order Details",
             "type": "object",

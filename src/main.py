@@ -28,6 +28,7 @@ async def main():
         tms_password = actor_input.get('tmsPassword', os.environ.get('TMS_PASSWORD'))
         gemini_api_key = actor_input.get('geminiApiKey', os.environ.get('GEMINI_API_KEY'))
         action = actor_input.get('action', os.environ.get('ACTION', 'EXTRACT_TRADEBOOK'))
+        history_months = actor_input.get('historyDurationMonths', int(os.environ.get('HISTORY_MONTHS', 12)))
         order_details = actor_input.get('orderDetails', {})
         
         # Headless Configuration (Default to True for Actor, but allow override)
@@ -41,7 +42,7 @@ async def main():
         if not gemini_api_key:
             print("WARNING: Missing Gemini API Key. Captcha solving might fail if strictly required.")
 
-        print(f"Configuration: URL={tms_website_url}, User: {tms_login_id}, Action: {action}, Headless: {is_headless}")
+        print(f"Configuration: URL={tms_website_url}, User: {tms_login_id}, Action: {action}, Headless: {is_headless}, Months: {history_months}")
 
         # 2. Setup Selenium
         chrome_options = Options()
@@ -78,7 +79,7 @@ async def main():
             result_data = {}
             
             if action == "EXTRACT_TRADEBOOK":
-                data = client.extract_tradebook()
+                data = client.extract_tradebook(months=history_months)
                 result_data = {"tradebook": data}
                 print(f"Extracted {len(data)} rows.")
                 

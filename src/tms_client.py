@@ -17,66 +17,75 @@ class TMSClient:
         # Optional: Check if market is open
         pass
 
-    def extract_tradebook(self):
+    def extract_tradebook(self, months=12):
         print("\n" + "="*30)
-        print("STARTING TRADE BOOK SCRAPING")
+        print("[DEBUG] STARTING TRADE BOOK SCRAPING")
         print("="*30)
         
         tms_no = get_tms_number(self.driver.current_url)
         history_url = f"https://tms{tms_no}.nepsetms.com.np/tms/me/trade-book-history"
         
-        print(f"Navigating to {history_url}...")
+        print(f"[DEBUG] Navigating to Tradebook History: {history_url}")
         self.driver.get(history_url)
         time.sleep(3)
         
         try:
             # Date Selection
             today = datetime.date.today()
-            start_date = today - datetime.timedelta(days=365) # Default 1 year
+            # Approximation: 30 days per month
+            days_to_subtract = months * 30
+            start_date = today - datetime.timedelta(days=days_to_subtract) 
             
             start_str = start_date.strftime("%Y-%m-%d")
             end_str = today.strftime("%Y-%m-%d")
             
-            print(f"Target Date Range: {start_str} to {end_str}")
+            print(f"[DEBUG] Target Date Range: {start_str} to {end_str} ({months} months)")
             
             # Locate Date Inputs
             start_input = None
             end_input = None
             
             try:
+                print("[DEBUG] Locating Date Inputs...")
                 start_input = self.driver.find_element(By.CSS_SELECTOR, "input[name='dpFromDate']")
                 end_input = self.driver.find_element(By.CSS_SELECTOR, "input[name='dpToDate']")
             except:
                 # Fallback
+                print("[DEBUG] Standard selectors failed. Trying fallback XPath...")
                 inputs = self.driver.find_elements(By.XPATH, "//input[@placeholder='yyyy-mm-dd']")
                 if len(inputs) >= 2:
                     start_input = inputs[0]
                     end_input = inputs[1]
 
             if start_input and end_input:
+                print("[DEBUG] Setting date values...")
                 js_set = "arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('change'));"
                 self.driver.execute_script(js_set, start_input, start_str)
                 self.driver.execute_script(js_set, end_input, end_str)
+            else:
+                 print("[DEBUG] WARNING: Could not find date inputs.")
             
             # Sets 100 items per page
             try:
+                print("[DEBUG] Attempting to set 'Items Per Page' to 100...")
                 page_size_select = self.driver.find_element(By.CSS_SELECTOR, "select[aria-label='items per page']")
                 select = Select(page_size_select)
                 select.select_by_value("100")
-                print("Selected 100 items per page.")
+                print("[DEBUG] Success: Selected 100 items per page.")
                 time.sleep(2)
             except Exception as e:
-                print(f"Could not set 100 items per page: {e}")
+                print(f"[DEBUG] Could not set 100 items per page: {e}")
 
             # Click Search
             try:
+                print("[DEBUG] Clicking Search Button...")
                 search_btn = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Search')]")
                 search_btn.click()
             except:
                 try:
                     self.driver.find_element(By.CSS_SELECTOR, "button.btn-primary").click()
                 except:
-                    print("Could not find Search button")
+                    print("[DEBUG] Could not find Search button")
             
             time.sleep(2)
             
@@ -86,6 +95,7 @@ class TMSClient:
             # Get Headers
             headers = []
             try:
+                print("[DEBUG] Extracting Headers...")
                 header_row = self.driver.find_elements(By.CSS_SELECTOR, "table thead tr th") # Generic
                 if not header_row:
                      header_row = self.driver.find_elements(By.CSS_SELECTOR, ".k-grid-header th") # Kendo
@@ -95,49 +105,58 @@ class TMSClient:
             
             if headers:
                 data.append(headers)
+                print(f"[DEBUG] Found Headers: {headers}")
 
             # Pagination Loop
+            page_count = 1
             while True:
+                print(f"[DEBUG] Scraping Page {page_count}...")
                 # Get Rows
                 try:
                     rows = self.driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
                     if not rows:
                         rows = self.driver.find_elements(By.CSS_SELECTOR, ".k-grid-content table tr") # Kendo
                     
+                    print(f"[DEBUG] Found {len(rows)} rows on this page.")
                     for row in rows:
                         cols = row.find_elements(By.TAG_NAME, "td")
                         row_data = [c.text.strip() for c in cols]
                         if any(row_data):
                             data.append(row_data)
                 except Exception as e:
-                    print(f"Error reading rows: {e}")
+                    print(f"[DEBUG] Error reading rows: {e}")
 
                 # Next Page
                 try:
                     next_btn = self.driver.find_element(By.CSS_SELECTOR, "a.k-pager-nav[title='Go to the next page']")
                     if "k-state-disabled" in next_btn.get_attribute("class"):
+                        print("[DEBUG] Next button disabled. End of pagination.")
                         break
+                    print("[DEBUG] moving to next page...")
                     next_btn.click()
+                    page_count += 1
                     time.sleep(2)
                 except:
+                    print("[DEBUG] Next button not found or other pagination error.")
                     break
             
             return data
 
         except Exception as e:
-            print(f"Error extracting tradebook: {e}")
+            print(f"[DEBUG] Error extracting tradebook: {e}")
             return []
 
     def place_order(self, action, symbol, quantity, price, order_type="LMT", validity="DAY"):
         """
         Action: 'BUY' or 'SELL'
         """
-        print(f"\nPlacing {action} Order: {symbol}, Qty: {quantity}, Price: {price}")
+        print(f"\n[DEBUG] Placing {action} Order: {symbol}, Qty: {quantity}, Price: {price}")
         
         tms_no = get_tms_number(self.driver.current_url)
         # Order Entry URL
         order_url = f"https://tms{tms_no}.nepsetms.com.np/tms/n/order/order-entry" # New TMS URL structure
         
+        print(f"[DEBUG] Navigating to Order Entry: {order_url}")
         self.driver.get(order_url)
         time.sleep(2)
         
