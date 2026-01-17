@@ -164,13 +164,18 @@ def perform_login(driver, username, password, api_key, login_url):
              print(f"Navigating to {login_url}...")
              driver.get(login_url)
         
-        wait = WebDriverWait(driver, 10)
+        # Wait for page to fully load
+        print("Waiting for page to load...")
+        time.sleep(3)  # Initial wait for JavaScript to execute
+        
+        wait = WebDriverWait(driver, 20)  # Increased from 10 to 20 seconds
         
         # LOGIN RETRY LOOP
         max_retries = 3
         
         for attempt in range(1, max_retries + 1):
             print(f"\n--- Login Attempt {attempt}/{max_retries} ---")
+            print(f"Current URL: {driver.current_url}")
             
             try:
                 # Check where we are
@@ -180,17 +185,43 @@ def perform_login(driver, username, password, api_key, login_url):
                 
                 # Fill Credentials
                 try:
+                    print("Looking for username field...")
                     username_field = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input[placeholder="Client Code/ User Name"]')))
+                    print("✓ Username field found")
                     username_field.clear()
                     username_field.send_keys(username)
                     
+                    print("Looking for password field...")
                     password_field = driver.find_element(By.CSS_SELECTOR, '#password-field')
+                    print("✓ Password field found")
                     password_field.clear()
                     password_field.send_keys(password)
-                except:
-                    print("Could not find login fields (maybe reloading?). Refreshing...")
+                    
+                except Exception as e:
+                    print(f"✗ Could not find login fields")
+                    print(f"   Error: {str(e)}")
+                    print(f"   Page title: {driver.title}")
+                    
+                    # Debug: Print what's on the page
+                    try:
+                        body_text = driver.find_element(By.TAG_NAME, "body").text[:500]
+                        print(f"   Page content preview: {body_text}")
+                    except:
+                        pass
+                    
+                    # Try alternate selectors
+                    print("   Trying alternate selectors...")
+                    try:
+                        all_inputs = driver.find_elements(By.TAG_NAME, "input")
+                        print(f"   Found {len(all_inputs)} input elements total")
+                        for i, inp in enumerate(all_inputs[:5]):
+                            print(f"   Input {i}: type={inp.get_attribute('type')}, placeholder={inp.get_attribute('placeholder')}")
+                    except:
+                        pass
+                    
+                    print("Refreshing page...")
                     driver.refresh()
-                    time.sleep(2)
+                    time.sleep(5)  # Longer wait after refresh
                     continue
 
                 # Solve Captcha
