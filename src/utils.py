@@ -50,12 +50,40 @@ def solve_captcha(driver, api_key):
         print(f"Error solving captcha: {e}")
         return None
 
-def perform_login(driver, username, password, api_key, login_url):
+def perform_login(driver, username, password, api_key, login_url, cookies=None):
     """
     Performs the full login flow with retries.
+    Optionally accepts cookies for session persistence.
     Returns True if login is successful, False otherwise.
     """
     try:
+        # 1. Try Cookie Login if provided
+        if cookies:
+            print("[DEBUG] Attempting login with saved cookies...")
+            try:
+                # Must navigate to domain first
+                driver.get(login_url) 
+                for cookie in cookies:
+                    # Selenium expects expiration as 'expiry' (int), sometimes provided as 'expires'
+                    if 'expiry' in cookie:
+                        cookie['expiry'] = int(cookie['expiry'])
+                    driver.add_cookie(cookie)
+                
+                print("[DEBUG] Cookies injected. Refreshing to verify session...")
+                driver.refresh()
+                time.sleep(5)
+                
+                if "dashboard" in driver.current_url or "tms/me" in driver.current_url:
+                    print("[DEBUG] Cookie Login SUCCESS!")
+                    return True
+                else:
+                    print("[DEBUG] Cookie Login FAILED (Session likely expired). Proceeding with fresh login.")
+                    driver.delete_all_cookies()
+            except Exception as e:
+                print(f"[DEBUG] Cookie injection failed: {e}")
+                driver.delete_all_cookies()
+
+        # 2. Credential Login
         print(f"[DEBUG] Checking if navigation needed. Current URL: {driver.current_url}")
         if driver.current_url == "data:," or "nepsetms" not in driver.current_url:
              print(f"[DEBUG] Navigating to {login_url}...")
