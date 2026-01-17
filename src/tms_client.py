@@ -190,13 +190,22 @@ class TMSClient:
                     for row in rows:
                         cols = row.find_all('td')
                         row_data = [c.get_text(strip=True) for c in cols]
+                        
+                        # Check for "No records available"
+                        if len(row_data) == 1 and "No records" in row_data[0]:
+                            print("[DEBUG] Found 'No records available'. Stopping scraping.")
+                            return data
+                            
                         if any(row_data):
                             current_page_data.append(row_data)
                     
                     if current_page_data:
                         data.extend(current_page_data)
+                        print(f"[DEBUG] Extracted {len(current_page_data)} rows.")
                     else:
-                        print("[DEBUG] No data found in rows (empty?).")
+                        print("[DEBUG] No valid data found in rows.")
+                        # If we found rows but they weren't valid data, maybe stop?
+                        # But sometimes blank rows exist. Safer to rely on Next button or "No records" check.
                         
                 except Exception as e:
                     print(f"[DEBUG] Error reading rows: {e}")
