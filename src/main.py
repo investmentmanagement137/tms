@@ -6,7 +6,7 @@ import json
 # Add src to path to allow imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from apify import Actor
+from apify import Actor, ProxyConfiguration
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -30,8 +30,9 @@ async def main():
         action = actor_input.get('action', os.environ.get('ACTION', 'EXTRACT_TRADEBOOK'))
         history_months = actor_input.get('historyDurationMonths', int(os.environ.get('HISTORY_MONTHS', 12)))
         order_details = actor_input.get('orderDetails', {})
-        
-        # Headless Configuration (Default to True for Actor, but allow override)
+        proxy_config_input = actor_input.get('proxyConfiguration')
+
+        # Headless Configuration
         is_headless = os.environ.get("HEADLESS", "true").lower() == "true"
 
         if not tms_login_id or not tms_password:
@@ -44,7 +45,7 @@ async def main():
 
         print(f"Configuration: URL={tms_website_url}, User: {tms_login_id}, Action: {action}, Headless: {is_headless}, Months: {history_months}")
 
-        # 2. Setup Selenium
+        # 2. Setup Selenium & Proxy
         chrome_options = Options()
         if is_headless:
             chrome_options.add_argument("--headless")
@@ -52,16 +53,24 @@ async def main():
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         
-        # Apify specific: run in xvfb if needed, handled by base image usually.
-        
+        # Proxy Setup
+        if proxy_config_input:
+            print("[DEBUG] Proxy configuration found. Setting up proxy...")
+            proxy_configuration = ProxyConfiguration(actor_input=proxy_config_input)
+            proxy_url = await proxy_configuration.new_url()
+            if proxy_url:
+                print(f"[DEBUG] Using Proxy: {proxy_url}")
+                chrome_options.add_argument(f'--proxy-server={proxy_url}')
+            else:
+                 print("[DEBUG] Proxy URL generation failed (None returned). Running without proxy.")
+        else:
+            print("[DEBUG] No proxy configuration provided.")
+
         print("Launching Chrome...")
-        # In Apify Docker, Chrome is pre-installed. WebDriver Manager might still work or use direct path.
-        # Fallback to direct 'chromedriver' if manager fails or generic setup.
         try:
              service = Service(ChromeDriverManager().install())
              driver = webdriver.Chrome(service=service, options=chrome_options)
         except:
-             # Fallback for Apify environment where 'chromedriver' is in PATH
              driver = webdriver.Chrome(options=chrome_options)
 
         client = TMSClient(driver)
