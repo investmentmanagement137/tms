@@ -1,0 +1,50 @@
+{
+    "title": "TMS Automation Actor",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "tmsWebsiteNo": {
+            "title": "TMS Website Number",
+            "type": "string",
+            "description": "The number of the TMS instance (e.g., 58, 49).",
+            "editor": "textfield",
+            "default": "58"
+        },
+        "tmsLoginId": {
+            "title": "TMS Login ID",
+            "type": "string",
+            "description": "Your TMS Client Code / Username.",
+            "editor": "textfield"
+        },
+        "tmsPassword": {
+            "title": "TMS Password",
+            "type": "string",
+            "description": "Your TMS Password.",
+            "editor": "textfield",
+            "isSecret": true
+        },
+        "geminiApiKey": {
+            "title": "Gemini API Key",
+            "type": "string",
+            "description": "API Key for Google Gemini (for Captcha solving).",
+            "editor": "textfield",
+            "isSecret": true
+        },
+        "action": {
+            "title": "Action",
+            "type": "string",
+            "description": "The action to perform.",
+            "editor": "select",
+            "enum": ["EXTRACT_TRADEBOOK", "BUY", "SELL", "EXTRACT_INFO"],
+            "default": "EXTRACT_TRADEBOOK"
+        },
+        "orderDetails": {
+            "title": "Order Details",
+            "type": "object",
+            "description": "Details for Buy/Sell orders.",
+            "editor": "json",
+            "default": {}
+        }
+    },
+    "required": ["tmsLoginId", "tmsPassword", "geminiApiKey", "action"]
+}

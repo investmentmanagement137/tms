@@ -1,18 +1,18 @@
-import time
-import io
 import re
-from google import genai
+import io
+import time
 from PIL import Image
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from google import genai
 
 def get_tms_number(url):
     """Extracts the TMS number from the URL."""
     match = re.search(r"tms(\d+)", url)
     if match:
         return match.group(1)
-    return "40" # Default
+    return "58" # Default to 58 as per current common
 
 def solve_captcha(driver, api_key):
     """Solves captcha: Priority 1 (DOM Value), Priority 2 (Gemini API)."""
@@ -44,7 +44,6 @@ def solve_captcha(driver, api_key):
         print("Capturing captcha screenshot...")
         screenshot = captcha_element.screenshot_as_png
         image = Image.open(io.BytesIO(screenshot))
-        # image.save("captcha.png") # Optional: Save for debug if needed
         
         print("Sending to Gemini API...")
         client = genai.Client(api_key=api_key)
@@ -70,16 +69,12 @@ def perform_login(driver, username, password, api_key, login_url):
     Returns True if login is successful, False otherwise.
     """
     try:
-        # Navigate to Login Page
-        # We handle dynamic TMS number if the provided URL is generic, 
-        # but usually the driver is already navigating or we navigate here.
-        if driver.current_url == "data:," or "neptse" not in driver.current_url:
+        if driver.current_url == "data:," or "nepsetms" not in driver.current_url:
              print(f"Navigating to {login_url}...")
              driver.get(login_url)
         
         wait = WebDriverWait(driver, 10)
         
-        # LOGIN RETRY LOOP
         max_retries = 3
         
         for attempt in range(1, max_retries + 1):
@@ -122,12 +117,18 @@ def perform_login(driver, username, password, api_key, login_url):
                         login_btn.click()
                         
                         # Wait for transition
-                        time.sleep(3)
-                        if "dashboard" in driver.current_url:
+                        time.sleep(5)
+                        if "dashboard" in driver.current_url or "tms/me" in driver.current_url:
                             print("Login successful!")
                             return True
                         else:
                             print("Login failed (URL did not change). Captcha might be wrong.")
+                            try:
+                                # Check for error message
+                                error_msg = driver.find_element(By.CSS_SELECTOR, ".toast-message").text
+                                print(f"Error Message: {error_msg}")
+                            except:
+                                pass
                             driver.refresh()
                             time.sleep(2)
                     except Exception as e:
