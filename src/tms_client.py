@@ -26,7 +26,23 @@ class TMSClient:
         history_url = f"https://tms{tms_no}.nepsetms.com.np/tms/me/trade-book-history"
         
         print(f"[DEBUG] Navigating to Tradebook History: {history_url}")
-        self.driver.get(history_url)
+        
+        # Set page load timeout to avoid hanging indefinitely
+        self.driver.set_page_load_timeout(180)
+        
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.driver.get(history_url)
+                print("[DEBUG] Navigation successful.")
+                break
+            except Exception as e:
+                print(f"[DEBUG] Navigation attempt {attempt} failed: {e}")
+                if attempt == max_retries:
+                     print("CRITICAL: Failed to load Trade Book History page.")
+                     return []
+                time.sleep(5)
+                
         time.sleep(3)
         
         try:
