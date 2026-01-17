@@ -12,6 +12,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # Maximum 10 minutes per run
     
     steps:
       - name: Checkout code
@@ -45,11 +46,13 @@ jobs:
           HEADLESS: "true"
         run: |
           python trade_book.py
+        timeout-minutes: 8  # Script-specific timeout
       
       - name: Upload CSV artifact (backup)
         uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
         with:
-          name: trade-book-history
+          name: trade-book-history-${{ github.run_number }}
           path: trade-book-history-*.csv
           retention-days: 7

@@ -16,52 +16,139 @@ def get_tms_number(url):
 
 def solve_captcha(driver, api_key):
     """Solves captcha: Priority 1 (DOM Value), Priority 2 (Gemini API)."""
+    import traceback
+    
     try:
-        print("Attempting to solve captcha...")
+        print("\n" + "="*50)
+        print("CAPTCHA SOLVING STARTED")
+        print("="*50)
         
         # Strategy 1: Check if value is already in the DOM
+        print("[Strategy 1] Checking DOM for pre-filled CAPTCHA value...")
         try:
             captcha_input = driver.find_element(By.ID, "captchaEnter")
             hidden_value = captcha_input.get_attribute("value")
             if hidden_value and len(hidden_value) > 2:
-                print(f"Strategy 1 Success: Found captcha value in DOM: '{hidden_value}'")
+                print(f"✓ [Strategy 1] SUCCESS: Found CAPTCHA in DOM: '{hidden_value}'")
+                print("="*50 + "\n")
                 return hidden_value
-        except:
-            pass
+            else:
+                print(f"✗ [Strategy 1] SKIPPED: DOM value empty or too short ('{hidden_value}')")
+        except Exception as e:
+            print(f"✗ [Strategy 1] FAILED: {str(e)}")
 
         # Strategy 2: Gemini API
-        print("Strategy 1 failed (No value found). Proceeding to Strategy 2 (Gemini API)...")
+        print("\n[Strategy 2] Proceeding to Gemini API CAPTCHA solving...")
+        print("-"*50)
         
-        print("Locating captcha image...")
+        # Step 1: Locate CAPTCHA image
+        print("[Step 1/5] Locating CAPTCHA image element...")
         try:
+            start_time = time.time()
             captcha_element = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'img.captcha-image-dimension'))
             )
-        except:
-             print("Could not find captcha image element.")
-             return None
+            print(f"✓ CAPTCHA image found in {time.time() - start_time:.2f}s")
+        except Exception as e:
+            print(f"✗ FAILED: Could not find CAPTCHA image element")
+            print(f"   Error: {str(e)}")
+            return None
         
-        print("Capturing captcha screenshot...")
-        screenshot = captcha_element.screenshot_as_png
-        image = Image.open(io.BytesIO(screenshot))
-        # image.save("captcha.png") # Optional: Save for debug if needed
+        # Step 2: Capture screenshot
+        print("[Step 2/5] Capturing CAPTCHA screenshot...")
+        try:
+            start_time = time.time()
+            screenshot = captcha_element.screenshot_as_png
+            image = Image.open(io.BytesIO(screenshot))
+            img_size = len(screenshot)
+            print(f"✓ Screenshot captured ({img_size} bytes) in {time.time() - start_time:.2f}s")
+            print(f"   Image dimensions: {image.size[0]}x{image.size[1]} pixels")
+            # Optionally save for debugging
+            # image.save("captcha_debug.png")
+        except Exception as e:
+            print(f"✗ FAILED: Could not capture screenshot")
+            print(f"   Error: {str(e)}")
+            return None
         
-        print("Sending to Gemini API...")
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=[
-                "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.", 
-                image
-            ]
-        )
+        # Step 3: Initialize Gemini client
+        print("[Step 3/5] Initializing Gemini API client...")
+        try:
+            if not api_key or len(api_key) < 10:
+                print(f"✗ FAILED: Invalid API key (length: {len(api_key) if api_key else 0})")
+                return None
+            
+            start_time = time.time()
+            client = genai.Client(api_key=api_key)
+            print(f"✓ Client initialized in {time.time() - start_time:.2f}s")
+            print(f"   API Key: {api_key[:10]}...{api_key[-4:]} (masked)")
+        except Exception as e:
+            print(f"✗ FAILED: Could not initialize Gemini client")
+            print(f"   Error: {str(e)}")
+            print(f"   Traceback: {traceback.format_exc()}")
+            return None
         
-        captcha_text = response.text.strip()
-        print(f"Gemini solved captcha: '{captcha_text}'")
-        return captcha_text
+        # Step 4: Send to Gemini API
+        print("[Step 4/5] Sending request to Gemini API...")
+        print(f"   Model: gemini-2.0-flash-exp")
+        try:
+            start_time = time.time()
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-exp",
+                contents=[
+                    "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.", 
+                    image
+                ]
+            )
+            api_time = time.time() - start_time
+            print(f"✓ API response received in {api_time:.2f}s")
+            
+            # Log response metadata if available
+            if hasattr(response, 'usage_metadata'):
+                print(f"   Usage: {response.usage_metadata}")
+            
+        except Exception as e:
+            print(f"✗ FAILED: Gemini API request failed")
+            print(f"   Error: {str(e)}")
+            print(f"   Error type: {type(e).__name__}")
+            print(f"   Traceback: {traceback.format_exc()}")
+            return None
+        
+        # Step 5: Extract and validate result
+        print("[Step 5/5] Extracting CAPTCHA text from response...")
+        try:
+            captcha_text = response.text.strip()
+            
+            # Validate result
+            if not captcha_text:
+                print(f"✗ FAILED: Empty response from Gemini")
+                print(f"   Raw response: {response}")
+                return None
+            
+            # Clean any extra characters
+            cleaned_text = re.sub(r'[^a-zA-Z0-9]', '', captcha_text)
+            
+            print(f"✓ CAPTCHA solved successfully!")
+            print(f"   Raw response: '{captcha_text}'")
+            print(f"   Cleaned text: '{cleaned_text}'")
+            print(f"   Length: {len(cleaned_text)} characters")
+            
+            if len(cleaned_text) < 4 or len(cleaned_text) > 8:
+                print(f"⚠ WARNING: Unusual CAPTCHA length (expected 4-6 chars)")
+            
+            print("="*50 + "\n")
+            return cleaned_text
+            
+        except Exception as e:
+            print(f"✗ FAILED: Could not extract text from response")
+            print(f"   Error: {str(e)}")
+            print(f"   Response object: {response}")
+            return None
         
     except Exception as e:
-        print(f"Error solving captcha: {e}")
+        print(f"\n✗ CRITICAL ERROR in solve_captcha:")
+        print(f"   {str(e)}")
+        print(f"   Traceback: {traceback.format_exc()}")
+        print("="*50 + "\n")
         return None
 
 def perform_login(driver, username, password, api_key, login_url):

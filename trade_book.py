@@ -411,8 +411,15 @@ def main():
     # Setup Chrome Options
     chrome_options = Options()
     if HEADLESS:
-        chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--headless=new")
+        # CI/CD environment optimizations
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-software-rasterizer")
+        chrome_options.add_argument("--window-size=1920,1080")
+    else:
+        chrome_options.add_argument("--start-maximized")
     
     # Initialize WebDriver using webdriver-manager
     print("Launching Chrome...")
@@ -435,16 +442,18 @@ def main():
             print("Login failed after max attempts. Exiting.")
 
         print("\n" + "="*50)
-        print("Script finished. Browser remains open.")
+        print("Script finished successfully.")
         print("="*50 + "\n")
         
-        # Keep waiting
-        while True:
-            time.sleep(1)
+        # Only keep browser open in interactive mode (not headless)
+        if not HEADLESS:
+            print("Browser remains open. Press Ctrl+C to exit.")
             try:
-                driver.title
+                while True:
+                    time.sleep(1)
+                    driver.title  # Check if browser is still open
             except:
-                break
+                print("Browser closed.")
             
     except KeyboardInterrupt:
         print("\nScript stopped by user.")
