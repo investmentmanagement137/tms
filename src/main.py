@@ -56,7 +56,7 @@ async def main():
         # Proxy Setup
         if proxy_config_input:
             print("[DEBUG] Proxy configuration found. Setting up proxy...")
-            proxy_configuration = ProxyConfiguration(actor_input=proxy_config_input)
+            proxy_configuration = ProxyConfiguration(actor_proxy_input=proxy_config_input)
             proxy_url = await proxy_configuration.new_url()
             if proxy_url:
                 print(f"[DEBUG] Using Proxy: {proxy_url}")
