@@ -17,7 +17,7 @@ from utils import perform_login
 
 # Configuration
 TMS_URL = "https://tms43.nepsetms.com.np/login"
-USERNAME = "Bp480035a"  # Replace with your username
+USERNAME = "Bp480035"  # Corrected username
 PASSWORD = input("Enter TMS Password: ")  # For security
 GEMINI_KEY = input("Enter Gemini API Key: ")
 
