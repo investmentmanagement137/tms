@@ -1,7 +1,7 @@
 apify>=2.0.0
 selenium>=4.0.0
 webdriver-manager>=4.0.0
-google-genai>=1.0.0
+google-generativeai>=0.3.0
 Pillow>=9.0.0
 boto3>=1.26.0
 pandas
