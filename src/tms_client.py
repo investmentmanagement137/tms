@@ -173,17 +173,30 @@ class TMSClient:
             while True:
                 print(f"[DEBUG] Scraping Page {page_count}...")
                 # Get Rows
+                # Get Rows using BeautifulSoup (FASTER)
                 try:
-                    rows = self.driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
-                    if not rows:
-                        rows = self.driver.find_elements(By.CSS_SELECTOR, ".k-grid-content table tr") # Kendo
+                    # Get table HTML directly
+                    table_html = self.driver.execute_script("return document.querySelector('table').outerHTML;")
+                    soup = BeautifulSoup(table_html, 'html.parser')
                     
-                    print(f"[DEBUG] Found {len(rows)} rows on this page.")
+                    rows = soup.select('tbody tr')
+                    if not rows:
+                         rows = soup.select('.k-grid-content table tr')
+                    
+                    print(f"[DEBUG] Found {len(rows)} rows on this page (via BS4).")
+                    
+                    current_page_data = []
                     for row in rows:
-                        cols = row.find_elements(By.TAG_NAME, "td")
-                        row_data = [c.text.strip() for c in cols]
+                        cols = row.find_all('td')
+                        row_data = [c.get_text(strip=True) for c in cols]
                         if any(row_data):
-                            data.append(row_data)
+                            current_page_data.append(row_data)
+                    
+                    if current_page_data:
+                        data.extend(current_page_data)
+                    else:
+                        print("[DEBUG] No data found in rows (empty?).")
+                        
                 except Exception as e:
                     print(f"[DEBUG] Error reading rows: {e}")
 
