@@ -118,11 +118,14 @@ async def main():
 
         # 2. Setup Selenium & Proxy
         chrome_options = Options()
+        
+        # Anti-detection options (matching working script)
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        
         if is_headless:
-            # Note: Extension support in Headless mode can be tricky. 
-            # Standard 'headless' might not support extensions.
-            # 'headless=new' is recommended for newer Chrome versions logic.
-            chrome_options.add_argument("--headless=new") 
+            chrome_options.add_argument("--headless")
         
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
