@@ -1,74 +1,57 @@
-# TMS Trade Book History Scraper
+# TMS Automation Apify Actor
 
-Automated scraper for NEPSE TMS (Trade Management System) Trade Book History with Supabase S3 upload.
+This Apify Actor automates interactions with the NEPSE TMS (Trade Management System). It supports login (with Gemini-powered Captcha solving), extracting trade books, and placing Buy/Sell orders.
 
 ## Features
 
-- 🔐 Automated login with CAPTCHA solving (using Gemini AI)
-- 📊 Scrapes Trade Book History for the last 365 days
-- 📄 Exports data to CSV
-- ☁️ Uploads to Supabase S3 storage
-- ⏰ GitHub Actions scheduled runs (before/after market hours)
-- 🔧 Configurable via environment variables
+- 🔐 **Automated Login**: Handles login flow including dynamic Captcha solving using Google Gemini API.
+- 📊 **Extract Tradebook**: Scrapes trade book history for the last 365 days.
+- 🛒 **Buy/Sell Orders**: Automates order placement (Limit orders).
+- 🧩 **Apify Integration**: Fully integrated with Apify platform (Inputs, Dataset, Docker).
 
-## Local Setup
+## Input Configuration
 
-1. **Install dependencies:**
+The Actor accepts the following input settings (defined in `input_schema.json`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tmsWebsiteNo` | String | The TMS instance number (e.g., "58", "49"). Default: "58". |
+| `tmsLoginId` | String | Your TMS User ID / Client Code. |
+| `tmsPassword` | String | Your TMS Password. |
+| `geminiApiKey` | String | Google Gemini API Key for captcha solving. |
+| `action` | Enum | Action to perform: `EXTRACT_TRADEBOOK`, `BUY`, `SELL`, `EXTRACT_INFO`. |
+| `orderDetails` | Object | JSON object for order details (e.g., `{"symbol": "NICA", "quantity": 10, "price": 500}`). |
+
+## Local Development
+
+1. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Configure credentials** in `trade_book.py` or set environment variables:
+2. **Run Locally**:
+   You can run the actor locally by setting environment variables or modifying `src/main.py` inputs directly for testing.
    ```bash
-   export TMS_USERNAME="your_username"
-   export TMS_PASSWORD="your_password"
-   export GEMINI_API_KEY="your_gemini_api_key"
+   python src/main.py
    ```
 
-3. **Run the scraper:**
-   ```bash
-   python trade_book.py
-   ```
+## Files Structure
 
-## GitHub Actions Setup
+- `src/`
+  - `main.py`: Entry point for the Actor.
+  - `tms_client.py`: Class handling TMS interactions (Page Object Model style).
+  - `utils.py`: Utilities for login and captcha solving.
+- `input_schema.json`: Defines the input UI for Apify.
+- `Dockerfile`: Configuration for building the Actor image.
+- `old_scripts/`: Archived original scripts.
 
-1. **Push this repo to GitHub**
+## Deployment to Apify
 
-2. **Add Repository Secrets** (Settings → Secrets and variables → Actions):
-   | Secret Name | Description |
-   |-------------|-------------|
-   | `TMS_USERNAME` | Your TMS login username |
-   | `TMS_PASSWORD` | Your TMS login password |
-   | `GEMINI_API_KEY` | Google Gemini API key for CAPTCHA |
-   | `SUPABASE_ENDPOINT` | Supabase S3 endpoint URL |
-   | `SUPABASE_REGION` | Supabase S3 region |
-   | `SUPABASE_ACCESS_KEY` | Supabase S3 access key |
-   | `SUPABASE_SECRET_KEY` | Supabase S3 secret key |
-   | `SUPABASE_BUCKET_NAME` | Target bucket name |
+1. Push this code to a Git repository.
+2. Create a new Actor on Apify.
+3. Connect the Actor to your Git repository.
+4. Build and Run.
 
-3. **The workflow runs automatically:**
-   - Mon-Fri at 4:00 AM UTC (9:45 AM Nepal) - Before market
-   - Mon-Fri at 9:30 AM UTC (3:15 PM Nepal) - After market
+## Safety Note
 
-4. **Manual trigger:** Go to Actions tab → "TMS Trade Book Scraper" → "Run workflow"
-
-## Files
-
-| File | Description |
-|------|-------------|
-| `trade_book.py` | Main scraper script (login, scrape, upload) |
-| `tms_login.py` | Simple login-only script |
-| `tms_utils.py` | Reusable login & CAPTCHA utilities |
-| `.github/workflows/scrape.yml` | GitHub Actions workflow |
-
-## Market Hours Note
-
-Trade Book History is only accessible **outside market hours**:
-- Before 10:00 AM Nepal Time
-- After 3:05 PM Nepal Time
-
-The GitHub Actions schedule is configured to run during these windows.
-
-## License
-
-Private use only.
+This tool performs sensitive financial actions (Trading). Ensure you test thoroughly with small quantities or in a safe environment if available. The authors are not responsible for any financial losses.

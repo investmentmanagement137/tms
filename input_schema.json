@@ -1,0 +1,77 @@
+{
+    "title": "TMS Automation Actor",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "proxyConfiguration": {
+            "title": "Proxy Configuration",
+            "type": "object",
+            "description": "Select proxies to be used by your crawler.",
+            "editor": "proxy",
+            "default": {
+                "useApifyProxy": true
+            }
+        },
+        "tmsWebsiteUrl": {
+            "title": "TMS Website URL",
+            "type": "string",
+            "description": "The full URL of your TMS login page (e.g., https://tms49.nepsetms.com.np/login).",
+            "editor": "textfield",
+            "default": "https://tms58.nepsetms.com.np/login"
+        },
+        "tmsLoginId": {
+            "title": "TMS Login ID",
+            "type": "string",
+            "description": "Your TMS Client Code / Username.",
+            "editor": "textfield"
+        },
+        "tmsPassword": {
+            "title": "TMS Password",
+            "type": "string",
+            "description": "Your TMS Password.",
+            "editor": "textfield",
+            "isSecret": true
+        },
+        "geminiApiKey": {
+            "title": "Gemini API Key",
+            "type": "string",
+            "description": "API Key for Google Gemini (for Captcha solving).",
+            "editor": "textfield",
+            "isSecret": true
+        },
+        "action": {
+            "title": "Action",
+            "type": "string",
+            "description": "The action to perform.",
+            "editor": "select",
+            "enum": [
+                "EXTRACT_TRADEBOOK",
+                "BUY",
+                "SELL",
+                "EXTRACT_INFO"
+            ],
+            "default": "EXTRACT_TRADEBOOK"
+        },
+        "historyDurationMonths": {
+            "title": "History Duration (Months)",
+            "type": "integer",
+            "description": "Number of months to scrape trade history for (e.g. 1, 12, 60).",
+            "editor": "number",
+            "default": 12,
+            "minimum": 1
+        },
+        "orderDetails": {
+            "title": "Order Details",
+            "type": "object",
+            "description": "Details for Buy/Sell orders.",
+            "editor": "json",
+            "default": {}
+        }
+    },
+    "required": [
+        "tmsLoginId",
+        "tmsPassword",
+        "geminiApiKey",
+        "action"
+    ]
+}
