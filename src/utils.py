@@ -50,54 +50,13 @@ def solve_captcha(driver, api_key):
         print(f"Error solving captcha: {e}")
         return None
 
-def perform_login(driver, username, password, api_key, login_url, cookies=None):
+def perform_login(driver, username, password, api_key, login_url):
     """
     Performs the full login flow with retries.
-    Optionally accepts cookies for session persistence.
     Returns True if login is successful, False otherwise.
     """
     try:
-        # 1. Try Cookie Login if provided
-        if cookies:
-            print(f"[DEBUG] Attempting login with saved cookies ({len(cookies)} cookies)...")
-            try:
-                # Navigate to base domain first (not /login to avoid fresh cookie conflict)
-                base_url = login_url.replace("/login", "")
-                driver.get(base_url)
-                time.sleep(2)
-                
-                # Clear any existing cookies to avoid conflicts
-                driver.delete_all_cookies()
-                print("[DEBUG] Cleared existing cookies.")
-                
-                # Inject saved cookies
-                for cookie in cookies:
-                    # Selenium expects expiration as 'expiry' (int)
-                    if 'expiry' in cookie:
-                        cookie['expiry'] = int(cookie['expiry'])
-                    try:
-                        driver.add_cookie(cookie)
-                    except Exception as ce:
-                        print(f"[DEBUG] Skipped cookie {cookie.get('name')}: {ce}")
-                
-                print(f"[DEBUG] Cookies injected. Navigating to Dashboard to verify session...")
-                dashboard_url = login_url.replace("/login", "/tms/client/dashboard")
-                driver.get(dashboard_url)
-                time.sleep(5)
-                
-                print(f"[DEBUG] Post-cookie navigation URL: {driver.current_url}")
-                
-                if "dashboard" in driver.current_url or "tms/me" in driver.current_url:
-                    print("[DEBUG] Cookie Login SUCCESS!")
-                    return True
-                else:
-                    print("[DEBUG] Cookie Login FAILED (Session likely expired). Proceeding with fresh login.")
-                    driver.delete_all_cookies()
-            except Exception as e:
-                print(f"[DEBUG] Cookie injection failed: {e}")
-                driver.delete_all_cookies()
-
-        # 2. Credential Login
+        # Navigate to login page
         print(f"[DEBUG] Checking if navigation needed. Current URL: {driver.current_url}")
         if driver.current_url == "data:," or "nepsetms" not in driver.current_url:
              print(f"[DEBUG] Navigating to {login_url}...")

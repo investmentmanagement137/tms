@@ -94,47 +94,23 @@ async def main():
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         try:
-            # ---------------------------------------------------------
-            # Session Persistence Logic
-            # ---------------------------------------------------------
-            session_store = await Actor.open_key_value_store(name="tms-session-store")
-            saved_cookies = await session_store.get_value("COOKIES")
-            
-            if saved_cookies:
-                Actor.log.info(f"Found saved session cookies. Attempting to restore session...")
-            else:
-                Actor.log.info("No saved session found. Proceeding with fresh login.")
-
-            # Login using utils (with cookie support)
+            # Login to TMS
             login_url = "https://tms43.nepsetms.com.np/login"
+            Actor.log.info('Attempting login to TMS...')
+            
             success = utils.perform_login(
                 driver, 
                 tms_username, 
                 tms_password, 
                 gemini_api_key, 
-                login_url,
-                cookies=saved_cookies
+                login_url
             )
             
             if not success:
                 await Actor.fail(status_message='Login failed after maximum attempts')
                 return
             
-            # Save cookies for next time
-            all_cookies = driver.get_cookies()
-            
-            # Filter out XSRF-TOKEN (it changes on every page load and causes CSRF issues)
-            session_cookies = [c for c in all_cookies if c['name'] != 'XSRF-TOKEN']
-            
-            # Debug: Log all cookie names and properties
-            Actor.log.info(f'Captured {len(all_cookies)} total cookies, saving {len(session_cookies)} session cookies:')
-            for c in session_cookies:
-                Actor.log.info(f"  - {c['name']}: domain={c.get('domain')}, httpOnly={c.get('httpOnly')}, expiry={c.get('expiry', 'session')}")
-            
-            await session_store.set_value("COOKIES", session_cookies)
-            Actor.log.info('Session cookies saved for next run.')
-            
-            # ---------------------------------------------------------
+            Actor.log.info('Login successful!')
             
             # Create TMS client for scraping
             Actor.log.info('Starting trade book scraping...')
