@@ -4,6 +4,8 @@ import os
 import sys
 import asyncio
 import json
+import datetime
+import time
 
 # Add src to path to allow imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -155,7 +157,6 @@ async def main():
             print("[DEBUG] No proxy configuration provided.")
 
         print("Launching Chrome...")
-        # ... (Driver init) ...
         try:
              service = Service(ChromeDriverManager().install())
              driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -165,11 +166,33 @@ async def main():
         client = TMSClient(driver)
         
         try:
+            # PROXY VERIFICATION TEST
+            if proxy_config_input:
+                print("[DEBUG] Testing proxy by checking IP...")
+                try:
+                    driver.get("https://httpbin.org/ip")
+                    time.sleep(2)
+                    page_text = driver.find_element(By.TAG_NAME, "body").text
+                    print(f"[DEBUG] Current IP Response: {page_text}")
+                except Exception as ip_test_err:
+                    print(f"[DEBUG] IP test failed: {ip_test_err}")
+            
             # 3. Login
             login_url = tms_website_url
             success = perform_login(driver, tms_login_id, tms_password, gemini_api_key, login_url)
             
             if not success:
+                # Save the page HTML for debugging
+                print("[DEBUG] Login failed. Saving page source for analysis...")
+                try:
+                    page_source = driver.page_source
+                    debug_filename = f"debug_403_page_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                    with open(debug_filename, 'w', encoding='utf-8') as f:
+                        f.write(page_source)
+                    print(f"[DEBUG] Saved page source to {debug_filename}")
+                except Exception as save_err:
+                    print(f"[DEBUG] Failed to save page source: {save_err}")
+                
                 await Actor.fail(status_message="Login Failed")
                 return
 
