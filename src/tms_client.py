@@ -6,7 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support import expected_conditions as EC
-from .utils import get_tms_number
+from utils import get_tms_number
 
 class TMSClient:
     def __init__(self, driver):

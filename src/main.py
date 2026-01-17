@@ -22,27 +22,31 @@ async def main():
         # 1. Get Input
         actor_input = await Actor.get_input() or {}
         
-        # Environment variables as fallback (for local testing without Apify input file)
-        tms_website_no = actor_input.get('tmsWebsiteNo', os.environ.get('TMS_WEBSITE_NO', '58'))
+        # Environment variables as fallback
+        tms_website_url = actor_input.get('tmsWebsiteUrl', os.environ.get('TMS_WEBSITE_URL', 'https://tms58.nepsetms.com.np/login'))
         tms_login_id = actor_input.get('tmsLoginId', os.environ.get('TMS_LOGIN_ID'))
         tms_password = actor_input.get('tmsPassword', os.environ.get('TMS_PASSWORD'))
         gemini_api_key = actor_input.get('geminiApiKey', os.environ.get('GEMINI_API_KEY'))
         action = actor_input.get('action', os.environ.get('ACTION', 'EXTRACT_TRADEBOOK'))
         order_details = actor_input.get('orderDetails', {})
+        
+        # Headless Configuration (Default to True for Actor, but allow override)
+        is_headless = os.environ.get("HEADLESS", "true").lower() == "true"
 
         if not tms_login_id or not tms_password:
             print("ERROR: Missing TMS Login ID or Password.")
-            await Actor.fail("Missing Credentials")
+            await Actor.fail(status_message="Missing Credentials")
             return
         
         if not gemini_api_key:
             print("WARNING: Missing Gemini API Key. Captcha solving might fail if strictly required.")
 
-        print(f"Configuration: TMS-{tms_website_no}, User: {tms_login_id}, Action: {action}")
+        print(f"Configuration: URL={tms_website_url}, User: {tms_login_id}, Action: {action}, Headless: {is_headless}")
 
         # 2. Setup Selenium
         chrome_options = Options()
-        chrome_options.add_argument("--headless")
+        if is_headless:
+            chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
@@ -63,11 +67,11 @@ async def main():
         
         try:
             # 3. Login
-            login_url = f"https://tms{tms_website_no}.nepsetms.com.np/login"
+            login_url = tms_website_url
             success = perform_login(driver, tms_login_id, tms_password, gemini_api_key, login_url)
             
             if not success:
-                await Actor.fail("Login Failed")
+                await Actor.fail(status_message="Login Failed")
                 return
 
             # 4. Perform Action
@@ -103,7 +107,7 @@ async def main():
 
         except Exception as e:
             print(f"Actor execution failed: {e}")
-            await Actor.fail(str(e))
+            await Actor.fail(status_message=str(e))
         finally:
             driver.quit()
 

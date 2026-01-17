@@ -71,7 +71,14 @@ def perform_login(driver, username, password, api_key, login_url):
     try:
         if driver.current_url == "data:," or "nepsetms" not in driver.current_url:
              print(f"Navigating to {login_url}...")
-             driver.get(login_url)
+             try:
+                 driver.get(login_url)
+             except Exception as nav_error:
+                 if "ERR_NAME_NOT_RESOLVED" in str(nav_error) or "ERR_CONNECTION_REFUSED" in str(nav_error):
+                     print(f"\nCRITICAL ERROR: Could not connect to {login_url}")
+                     print("Please check your 'TMS Website No' configuration.")
+                     print("Examples: 49, 58, 34, etc.")
+                 raise nav_error
         
         wait = WebDriverWait(driver, 10)
         
