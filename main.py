@@ -121,14 +121,17 @@ async def main():
                 return
             
             # Save cookies for next time
-            new_cookies = driver.get_cookies()
+            all_cookies = driver.get_cookies()
+            
+            # Filter out XSRF-TOKEN (it changes on every page load and causes CSRF issues)
+            session_cookies = [c for c in all_cookies if c['name'] != 'XSRF-TOKEN']
             
             # Debug: Log all cookie names and properties
-            Actor.log.info(f'Captured {len(new_cookies)} cookies after login:')
-            for c in new_cookies:
-                Actor.log.info(f"  - {c['name']}: domain={c.get('domain')}, httpOnly={c.get('httpOnly')}, secure={c.get('secure')}")
+            Actor.log.info(f'Captured {len(all_cookies)} total cookies, saving {len(session_cookies)} session cookies:')
+            for c in session_cookies:
+                Actor.log.info(f"  - {c['name']}: domain={c.get('domain')}, httpOnly={c.get('httpOnly')}, expiry={c.get('expiry', 'session')}")
             
-            await session_store.set_value("COOKIES", new_cookies)
+            await session_store.set_value("COOKIES", session_cookies)
             Actor.log.info('Session cookies saved for next run.')
             
             # ---------------------------------------------------------
