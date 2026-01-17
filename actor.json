@@ -1,0 +1,11 @@
+{
+    "name": "tms-automation-actor",
+    "version": "0.1.0",
+    "title": "TMS Automation Actor",
+    "description": "Automated trading and data extraction for NEPSE TMS.",
+    "input": "./input_schema.json",
+    "dockerfile": "./Dockerfile",
+    "environmentVariables": {
+        "HEADLESS": "true"
+    }
+}
