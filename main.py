@@ -145,7 +145,7 @@ async def main():
                 try:
                     # Ensure we are on dashboard or navigate there?
                     # extract_dashboard_data runs on current page
-                    dash_data = await dashboard.extract_dashboard_data(page)
+                    dash_data = await dashboard.extract_dashboard_data(page, tms_url)
                     final_output["dashboard"] = dash_data
                     Actor.log.info("Dashboard data extracted.")
                 except Exception as e:

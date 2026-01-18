@@ -1,13 +1,22 @@
 from playwright.async_api import Page
 
-async def extract_dashboard_data(page: Page) -> dict:
+async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
     """
     Extracts summary data from the TMS Dashboard.
-    Returns a dictionary with keys:
-      - collateral: { amount, utilized, available }
-      - limits: { total, utilized, available }
-      - summary_items: list of { label, value }
+    Navigate to the desktop dashboard first to ensure correct structure.
+    Returns a dictionary with keys: fundSummary, tradeSummary, collateralSummary, marketStatus
     """
+    dashboard_url = f"{tms_url.rstrip('/')}/tms/client/dashboard"
+    print(f"[DEBUG] Navigating to Dashboard: {dashboard_url}")
+    
+    try:
+        await page.goto(dashboard_url, wait_until='networkidle')
+        await page.wait_for_selector('.card-header, .figure', timeout=10000)
+        await page.wait_for_timeout(2000) # Extra buffer for dynamic values
+    except Exception as e:
+        print(f"[DEBUG] Error loading dashboard: {e}")
+        return {}
+
     print("Extracting dashboard data...")
     
     # We use page.evaluate to run extraction logic in the browser context
