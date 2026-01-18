@@ -332,23 +332,29 @@ curl --request POST \
 ```
 *Credentials AND `tmsUrl` are automatically pulled from your saved Actor configuration.*
 ### 4. Batch Trading (Multiple Orders)
-To buy/sell multiple stocks in one run:
+To buy/sell multiple stocks in one run, use the `orders` array.
+
+#### Scenario A: Accumulation (Buying Multiple Stocks)
 ```bash
-curl --request POST \
-  --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "tmsUrl": "https://tms58.nepsetms.com.np",
-    "checkOrders": true,
+curl ... --data '{
+    "action": "CHECK_ORDERS", 
     "orders": [
         { "symbol": "NICA", "qty": 10, "price": 450, "side": "BUY" },
-        { "symbol": "HIDCL", "qty": 50, "price": 200, "side": "SELL" }
+        { "symbol": "NABIL", "qty": 5, "price": 900, "side": "BUY" }
     ],
-    "tmsUsername": "USER",
-    "tmsPassword": "PASS",
-    "geminiApiKey": "KEY"
+    "checkOrders": true
 }'
 ```
-**Optimized**: verification runs only **ONCE** at the end.
+*(Note: Top-level `action` is ignored in batch mode, but "CHECK_ORDERS" is a safe default)*.
 
+#### Scenario B: Rebalancing (Buy & Sell Mix)
+```bash
+curl ... --data '{
+    "orders": [
+        { "symbol": "AHPC", "qty": 100, "price": 250, "side": "SELL" },
+        { "symbol": "HIDCL", "qty": 50, "price": 200, "side": "BUY" }
+    ]
+}'
+```
 
+**Optimized**: Order book verification runs only **ONCE** at the end of the batch.
