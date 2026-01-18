@@ -72,16 +72,29 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         # 3. Enter Symbol
         print(f"[DEBUG] Step 3: Entering Symbol: {symbol}")
-        # Verified selector: input.form-control.form-control-sm (symbol input)
-        symbol_input = page.locator("input.form-control.form-control-sm").first
-        if await symbol_input.is_visible():
-            await symbol_input.click()
-            await symbol_input.fill(symbol)
-            print(f"[DEBUG] Symbol filled: {symbol}")
-        else:
-            # Fallback
-            await page.fill("input[formcontrolname='symbol']", symbol)
-            print(f"[DEBUG] Symbol filled via formcontrolname")
+        # FIX: input.form-control.form-control-sm was matching disabled Client Name field!
+        # Use specific formcontrolname='symbol' selector instead
+        symbol_selectors = [
+            "input[formcontrolname='symbol']",     # Primary: specific to symbol field
+            "input[ng-reflect-name='symbol']",    # Angular alternative
+            "input[placeholder*='Symbol']",        # By placeholder
+        ]
+        
+        symbol_filled = False
+        for sel in symbol_selectors:
+            try:
+                symbol_input = page.locator(sel).first
+                if await symbol_input.is_visible():
+                    await symbol_input.click()
+                    await symbol_input.fill(symbol)
+                    symbol_filled = True
+                    print(f"[DEBUG] Symbol filled using: {sel}")
+                    break
+            except:
+                pass
+        
+        if not symbol_filled:
+            print("[DEBUG] WARNING: Could not fill symbol field!")
         
         await page.keyboard.press("Tab")
         await page.wait_for_timeout(1500)  # Wait for symbol autocomplete

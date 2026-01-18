@@ -56,13 +56,28 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         # 3. Enter Symbol
         print(f"[DEBUG] Step 3: Entering Symbol: {symbol}")
-        symbol_input = page.locator("input.form-control.form-control-sm").first
-        if await symbol_input.is_visible():
-            await symbol_input.click()
-            await symbol_input.fill(symbol)
-            print(f"[DEBUG] Symbol filled: {symbol}")
-        else:
-            await page.fill("input[formcontrolname='symbol']", symbol)
+        # FIX: input.form-control.form-control-sm was matching disabled Client Name!
+        symbol_selectors = [
+            "input[formcontrolname='symbol']",
+            "input[ng-reflect-name='symbol']",
+            "input[placeholder*='Symbol']",
+        ]
+        
+        symbol_filled = False
+        for sel in symbol_selectors:
+            try:
+                symbol_input = page.locator(sel).first
+                if await symbol_input.is_visible():
+                    await symbol_input.click()
+                    await symbol_input.fill(symbol)
+                    symbol_filled = True
+                    print(f"[DEBUG] Symbol filled using: {sel}")
+                    break
+            except:
+                pass
+        
+        if not symbol_filled:
+            print("[DEBUG] WARNING: Could not fill symbol field!")
         
         await page.keyboard.press("Tab")
         await page.wait_for_timeout(1500)
