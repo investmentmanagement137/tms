@@ -133,7 +133,44 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                     print("[DEBUG] Refresh button not found, scraping current state.")
 
                 # 2. Scrape Table with Actions
-                rows = page.locator(".table tbody tr")
+                # 2. Scrape Client's Order Book Table (NOT Market Depth)
+                # The "Daily Order Book" is likely a tab or separate section.
+                # Strategy: Ensure "Daily Order Book" tab is active, then find the grid inside it.
+                
+                # Try clicking "Daily Order Book" tab if visible
+                try:
+                    daily_tab = page.locator("a:has-text('Daily Order Book'), span:has-text('Daily Order Book')").first
+                    if await daily_tab.is_visible():
+                         await daily_tab.click()
+                         await page.wait_for_timeout(1000)
+                except: pass
+
+                # Now target the table. Assuming Kendo Grid or similar.
+                # Use a more specific selector than just ".table" which hits Market Depth first.
+                # Logic: Look for the table that has headers like 'Symbol', 'Order No' or simply the second table.
+                # Or look for the container with class 'daily-order-book' (if it existed)
+                # Best guess from dump: The second or third table, or the one inside the tab content.
+                
+                # Let's try finding the table that contains "Order No" or "Status" in header
+                target_table = None
+                tables = page.locator("table")
+                count_tables = await tables.count()
+                
+                print(f"[DEBUG] Found {count_tables} tables. Searching for Client Order Book...")
+                for t_idx in range(count_tables):
+                    tbl = tables.nth(t_idx)
+                    header_text = await tbl.text_content() 
+                    if "Order No" in header_text or "Status" in header_text or "Action" in header_text:
+                        target_table = tbl
+                        print(f"[DEBUG] Found likely Order Book table at index {t_idx}")
+                        break
+                
+                if target_table:
+                    rows = target_table.locator("tbody tr")
+                else:
+                    # Fallback to previous logic (risky)
+                     rows = page.locator(".table tbody tr")
+
                 count = await rows.count()
                 order_book_entries = []
                 

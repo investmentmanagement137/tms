@@ -105,7 +105,30 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                     print("[DEBUG] Refresh button not found.")
 
                 # 2. Scrape Table with Actions
-                rows = page.locator(".table tbody tr")
+                # 2. Scrape Client's Order Book
+                try:
+                    daily_tab = page.locator("a:has-text('Daily Order Book'), span:has-text('Daily Order Book')").first
+                    if await daily_tab.is_visible():
+                         await daily_tab.click()
+                         await page.wait_for_timeout(1000)
+                except: pass
+
+                target_table = None
+                tables = page.locator("table")
+                count_tables = await tables.count()
+                
+                for t_idx in range(count_tables):
+                    tbl = tables.nth(t_idx)
+                    header_text = await tbl.text_content() 
+                    if "Order No" in header_text or "Status" in header_text or "Action" in header_text:
+                        target_table = tbl
+                        break
+                
+                if target_table:
+                    rows = target_table.locator("tbody tr")
+                else:
+                     rows = page.locator(".table tbody tr")
+
                 count = await rows.count()
                 order_book_entries = []
                 
