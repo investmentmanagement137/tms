@@ -1,9 +1,9 @@
 """
-Apify Actor entry point for TMS Trade Book Scraper
+Apify Actor entry point for TMS Order Executor
 """
 import os
-import os
 import datetime
+import json
 import boto3
 from apify import Actor
 from selenium import webdriver
@@ -11,9 +11,10 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Import from src folder
-from src import utils
-from src import tms_client
+# Import modular scripts
+from src import login
+from src import buy_stock
+from src import daily_history
 
 
 def upload_to_supabase(file_path, endpoint, region, access_key, secret_key, bucket_name):
@@ -45,45 +46,39 @@ async def main():
         # Get input from Apify
         actor_input = await Actor.get_input() or {}
         
-        # Extract inputs with fallbacks
+        # Extract inputs
         tms_username = actor_input.get('tmsUsername')
         tms_password = actor_input.get('tmsPassword')
         gemini_api_key = actor_input.get('geminiApiKey')
+        tms_url = actor_input.get('tmsUrl')
+        
+        action = actor_input.get('action', 'CHECK_ORDERS') # Default to safer option
         
         supabase_endpoint = actor_input.get('supabaseEndpoint', '')
         supabase_region = actor_input.get('supabaseRegion', 'ap-southeast-1')
         supabase_access_key = actor_input.get('supabaseAccessKey', '')
         supabase_secret_key = actor_input.get('supabaseSecretKey', '')
         supabase_bucket_name = actor_input.get('supabaseBucketName', 'investment_management')
-        days_to_scrape = actor_input.get('daysToScrape', 365)
         upload_to_s3 = actor_input.get('uploadToS3', True)
         
-        # Validate required inputs
-        if not all([tms_username, tms_password, gemini_api_key]):
-            await Actor.fail('Missing required inputs: tmsUsername, tmsPassword, or geminiApiKey')
+        # Validate Credentials
+        if not all([tms_username, tms_password, gemini_api_key, tms_url]):
+            await Actor.fail('Missing required credentials: tmsUsername, tmsPassword, geminiApiKey, or tmsUrl')
             return
+
+        Actor.log.info(f'Starting TMS Actor: Action = {action} on {tms_url}')
         
-        Actor.log.info('Starting TMS Trade Book Scraper...')
-        Actor.log.info(f'Scraping last {days_to_scrape} days of trade history')
-        
-        # Setup Chrome Options for Apify environment
+        # Setup Chrome Options
         chrome_options = Options()
-        
-        # Apify runs in headless mode
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-software-rasterizer")
         chrome_options.add_argument("--window-size=1920,1080")
-        
-        # Add realistic User-Agent
         chrome_options.add_argument(
             'user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
             'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
         )
-        
-        # Anti-detection measures
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -94,115 +89,89 @@ async def main():
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         try:
-            # Login to TMS
-            login_url = "https://tms43.nepsetms.com.np/login"
-            Actor.log.info('Attempting login to TMS...')
-            
-            success = utils.perform_login(
-                driver, 
-                tms_username, 
-                tms_password, 
-                gemini_api_key, 
-                login_url
-            )
+            # 1. Perform Login
+            Actor.log.info('Executing Login Script...')
+            # tmsUrl is passed from input
+            success = login.login(driver, tms_username, tms_password, gemini_api_key, tms_url)
             
             if not success:
-                await Actor.fail(status_message='Login failed after maximum attempts')
+                await Actor.fail(status_message='Login failed')
                 return
             
             Actor.log.info('Login successful!')
             
-            # Create TMS client for scraping
-            Actor.log.info('Starting trade book scraping...')
-            client = tms_client.TMSClient(driver)
-            
-            # Convert days to months (approx 30 days per month)
-            months = max(1, days_to_scrape // 30)
-            
-            data = client.extract_tradebook(months=months)
-            
-            if not data or len(data) <= 1: # Empty or just headers
-                Actor.log.warning('No trade book data found for the specified period.')
-                await Actor.push_data([]) # Push empty to finish cleanly
-                return # Exit successfully
-            
-            Actor.log.info(f'Extracted {len(data)-1} trade records')
-            # Parse data into list of dicts
-            json_data = []
-            if len(data) > 1:
-                headers = data[0]
-                rows = data[1:]
-                for row in rows:
-                    if len(row) == len(headers):
-                        json_data.append(dict(zip(headers, row)))
-            
-            if not json_data:
-                await Actor.fail(status_message='No trade book data to save (empty or header only)')
-                return
+            final_output = {
+                "action": action,
+                "status": "SUCCESS",
+                "timestamp": str(datetime.datetime.now())
+            }
 
-            # Save data to JSON
+            # 2. Execute Action
+            if action == 'BUY':
+                symbol = actor_input.get('symbol')
+                buy_price = actor_input.get('buyPrice')
+                buy_quantity = actor_input.get('buyQuantity')
+                
+                if not all([symbol, buy_price, buy_quantity]):
+                    await Actor.fail('For BUY action, you must provide: symbol, buyPrice, buyQuantity')
+                    return
+                
+                # Clean inputs
+                symbol = str(symbol).strip().upper()
+                try:
+                    buy_price = float(buy_price)
+                    buy_quantity = int(buy_quantity)
+                except ValueError:
+                    await Actor.fail('buyPrice must be a number and buyQuantity must be an integer.')
+                    return
+
+                Actor.log.info('Executing Buy Stock Script...')
+                order_result = buy_stock.execute(driver, tms_url, symbol, buy_quantity, buy_price)
+                
+                final_output.update(order_result)
+                
+                # Check Orders after buying
+                Actor.log.info('Executing Daily History Script (Verification)...')
+                orders = daily_history.extract(driver, tms_url)
+                final_output["todaysOrderPage"] = orders
+
+            elif action == 'CHECK_ORDERS':
+                Actor.log.info('Executing Daily History Script...')
+                orders = daily_history.extract(driver, tms_url)
+                final_output["todaysOrderPage"] = orders
+            
+            else:
+                Actor.log.warning(f"Unknown action: {action}")
+                final_output["message"] = "Unknown action"
+            
+            # 3. Save Output
             today = datetime.date.today()
-            json_filename = f"trade-book-history-{today}.json"
+            filename = f"tms-output-{today}.json"
             
-            import json
-            Actor.log.info(f'Saving formatted JSON to {json_filename}...')
-            with open(json_filename, 'w', encoding='utf-8') as f:
-                json.dump(json_data, f, indent=4, ensure_ascii=False)
+            Actor.log.info(f'Saving response to {filename}...')
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(final_output, f, indent=4, ensure_ascii=False)
             
-            Actor.log.info(f'Successfully saved {len(json_data)} records to JSON')
+            # Save to Apify Store
+            await Actor.set_value('OUTPUT', final_output)
+            await Actor.push_data(final_output)
             
-            # Save JSON to Apify key-value store
-            Actor.log.info('Saving JSON to Apify storage...')
-            with open(json_filename, 'r', encoding='utf-8') as f:
-                await Actor.set_value('OUTPUT', f.read(), content_type='application/json')
-            
-            # Upload to S3 if enabled
+            # Upload to S3
             if upload_to_s3 and all([supabase_endpoint, supabase_access_key, supabase_secret_key]):
                 Actor.log.info('Uploading JSON to Supabase S3...')
-                success = upload_to_supabase(
-                    json_filename,
-                    supabase_endpoint,
-                    supabase_region,
-                    supabase_access_key,
-                    supabase_secret_key,
-                    supabase_bucket_name
-                )
-                if success:
-                    Actor.log.info('Upload complete!')
-                else:
-                    Actor.log.warning('S3 upload failed')
-            elif upload_to_s3:
-                Actor.log.warning('S3 upload requested but credentials missing - skipping')
+                upload_to_supabase(filename, supabase_endpoint, supabase_region, supabase_access_key, supabase_secret_key, supabase_bucket_name)
             
-            # Push to dataset as well (Apify handles formatting there too)
-            Actor.log.info('Pushing data to Apify dataset...')
-            await Actor.push_data(json_data)
-            Actor.log.info(f'Pushed {len(json_data)} records to dataset')
-            
-            Actor.log.info('✅ Scraping completed successfully!')
+            Actor.log.info('✅ Workflow Completed Successfully!')
             
         except Exception as e:
-            Actor.log.error(f'Error during scraping: {e}')
+            Actor.log.error(f'Error during execution: {e}')
             import traceback
             Actor.log.error(traceback.format_exc())
-            
-            # Upload any debug screenshots found (BEFORE failing)
-            import glob
-            screenshots = glob.glob("*.png")
-            for screenshot in screenshots:
-                try:
-                    Actor.log.info(f"Uploading debug screenshot: {screenshot}")
-                    with open(screenshot, 'rb') as f:
-                        await Actor.set_value(screenshot, f.read(), content_type='image/png')
-                except Exception as ex:
-                    Actor.log.warning(f"Failed to upload screenshot {screenshot}: {ex}")
-            
             await Actor.fail(status_message=str(e))
             
         finally:
             driver.quit()
             Actor.log.info('Browser closed')
-
 
 if __name__ == '__main__':
     import asyncio
