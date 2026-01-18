@@ -52,6 +52,13 @@ async def main():
         gemini_api_key = actor_input.get('geminiApiKey')
         tms_url = actor_input.get('tmsUrl')
         
+        # Sanitize tmsUrl to remove trailing /login or /
+        if tms_url:
+            tms_url = tms_url.strip().rstrip('/')
+            if tms_url.endswith('/login'):
+                tms_url = tms_url[:-6] # Remove /login
+            tms_url = tms_url.rstrip('/') # Clean again
+            
         action = actor_input.get('action', 'CHECK_ORDERS') # Default to safer option
         
         supabase_endpoint = actor_input.get('supabaseEndpoint', '')
@@ -130,10 +137,14 @@ async def main():
                 
                 final_output.update(order_result)
                 
-                # Check Orders after buying
-                Actor.log.info('Executing Daily History Script (Verification)...')
-                orders = daily_history.extract(driver, tms_url)
-                final_output["todaysOrderPage"] = orders
+                # Check Orders after buying (Optional)
+                check_orders = actor_input.get('checkOrders', True)
+                if check_orders:
+                    Actor.log.info('Executing Daily History Script (Verification)...')
+                    orders = daily_history.extract(driver, tms_url)
+                    final_output["todaysOrderPage"] = orders
+                else:
+                    Actor.log.info('Skipping order verification (checkOrders=False)')
 
             elif action == 'CHECK_ORDERS':
                 Actor.log.info('Executing Daily History Script...')
