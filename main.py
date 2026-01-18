@@ -105,9 +105,18 @@ async def main():
                             Actor.log.warning("Saved session expired or invalid.")
                      except:
                         Actor.log.warning("Session verification failed (timeout).")
+                        # DO NOT return, just mark as not logged in.
+                        is_logged_in = False
+                        # If the page failed to load or got stuck, let's close context and retry clean
+                        # But simplest is to just proceed to login logic.
                 
                 # 3. Perform Login (if not logged in)
                 if not is_logged_in:
+                    # Clear cookies if session failed validation to avoid weird states
+                    if session_state:
+                         Actor.log.info("Clearing invalid session state before re-login...")
+                         await context.clear_cookies()
+                    
                     Actor.log.info('Executing Login Script...')
                     success = await login.login(page, tms_username, tms_password, gemini_api_key, tms_url)
                     

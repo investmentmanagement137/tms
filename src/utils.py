@@ -125,8 +125,13 @@ async def perform_login(page, username, password, api_key, tms_url):
             print(f"[DEBUG] Error during login attempt: {e}")
             
         print("Refreshing page for retry...")
-        await page.reload()
-        await page.wait_for_timeout(2000)
+        print("Refreshing page for retry...")
+        try:
+            await page.reload()
+            await page.wait_for_timeout(2000)
+        except Exception as reload_err:
+             print(f"[CRITICAL] Page crashed during reload: {reload_err}. Returning False to force restart.")
+             return False
         
     return False
 
