@@ -67,12 +67,17 @@ async def main():
             
             # Create Context with User Agent (and optional storage state)
             
-            # 1. Try to load session from Apify KV Store
-            session_state = await Actor.get_value('SESSION')
+            # Create Context with User Agent (and optional storage state)
+            
+            # 1. Try to load session from NAMED Key-Value Store (Shared across runs)
+            # We use a named store 'tms-sessions' so it persists!
+            session_store = await Actor.open_key_value_store(name='tms-sessions')
+            session_state = await session_store.get_value('SESSION')
+            
             if session_state:
-                Actor.log.info("Found saved session. Loading...")
+                Actor.log.info("Found saved session in 'tms-sessions' store. Loading...")
             else:
-                Actor.log.info("No saved session found.")
+                Actor.log.info("No saved session found in 'tms-sessions' store.")
                 
             context = await browser.new_context(
                 viewport={'width': 1920, 'height': 1080},
@@ -112,10 +117,10 @@ async def main():
                     
                     Actor.log.info('Login successful!')
                     
-                    # 4. Save New Session
-                    Actor.log.info("Saving session state...")
+                    # 4. Save New Session to NAMED Store
+                    Actor.log.info("Saving session state to 'tms-sessions'...")
                     storage_state = await context.storage_state()
-                    await Actor.set_value('SESSION', storage_state)
+                    await session_store.set_value('SESSION', storage_state)
                 
                 final_output = {
                     "version": VERSION,
