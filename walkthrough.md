@@ -310,27 +310,31 @@ curl --request POST \
 }'
 ```
 
-### 3. Secure Usage (Recommended)
-**Is adding credential here safe?**
-Passing credentials in the command line can be risky (history logs). 
-**Best Practice**:
-1.  Go to the **Apify Console** > **Actor** > **Inputs**.
-2.  Enter your `tmsUsername`, `tmsPassword`, and `geminiApiKey` there and **Save**.
-3.  Now, your API requests only need the trading details! The actor will use the saved values for the rest.
+### 3. API Usage (Secure Method via Saved Tasks)
+**Recommended**: To avoid sending sensitive credentials (Password/API Key) in every API call, use **Saved Tasks**.
 
-**Secure Payload Example:**
+1.  In Apify Console, open your Actor.
+2.  Click **"Create a new task"** (top right).
+3.  In the Task, fill in your `tmsUsername`, `tmsPassword`, `geminiApiKey`, and `tmsUrl`. **Save**.
+4.  Use the **Task API URL** (not Actor URL) to run it.
+
+#### Run Task via n8n / cURL
+You only need to send the changing data (e.g., `orders`). Credentials are loaded from the Task.
+
 ```bash
 curl --request POST \
-  --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
+  --url 'https://api.apify.com/v2/actor-tasks/YOUR_TASK_ID/runs?token=YOUR_TOKEN' \
   --header 'Content-Type: application/json' \
   --data '{
-    "action": "BUY",
-    "symbol": "NICA",
-    "buyQuantity": 10,
-    "buyPrice": 450
+    "action": "BATCH",
+    "orders": [
+        { "symbol": "NICA", "qty": 10, "price": 450, "side": "BUY" }
+    ]
 }'
 ```
-*Credentials AND `tmsUrl` are automatically pulled from your saved Actor configuration.*
+
+---
+
 ### 4. Batch Trading (Multiple Orders)
 To buy/sell multiple stocks in one run, use the `orders` array.
 
