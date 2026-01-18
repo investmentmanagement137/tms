@@ -47,8 +47,7 @@
             "title": "Stock Symbol (Single Mode)",
             "type": "string",
             "description": "Stock Symbol (Required for BUY/SELL actions)",
-            "editor": "textfield",
-            "sectionCaption": "Single Order Details"
+            "editor": "textfield"
         },
         "price": {
             "title": "Price",
@@ -66,7 +65,6 @@
             "title": "Batch Orders List",
             "type": "array",
             "description": "List of orders to execute in BATCH mode.",
-            "sectionCaption": "Batch Mode Configuration",
             "editor": "json",
             "items": {
                 "type": "object",
@@ -103,9 +101,9 @@
             }
         },
         "checkOrders": {
-            "title": "Check Orders After Buy?",
+            "title": "Verify Orders (Global)?",
             "type": "boolean",
-            "description": "If true, scrapes Today's Order Book after placing the order to verify.",
+            "description": "If true, scrapes order book after execution. Applies to BOTH Single and Batch modes.",
             "default": true
         },
         "uploadToS3": {
