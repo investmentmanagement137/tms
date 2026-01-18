@@ -61,6 +61,12 @@ async def perform_login(page, username, password, api_key, tms_url):
     """
     Performs login to TMS (Async Playwright).
     Returns True if login is successful, False otherwise.
+    
+    Implements robust error handling:
+    - Multiple navigation strategies
+    - Explicit element waits with fallbacks
+    - Error categorization and recovery
+    - Fresh page creation on crash
     """
     # Ensure URL ends with /login for the initial navigation
     if not tms_url.endswith("/login"):
@@ -68,84 +74,219 @@ async def perform_login(page, username, password, api_key, tms_url):
     else:
         login_url = tms_url
         
-    print(f"Navigating to Login Page: {login_url}")
+    print(f"[LOGIN] Target URL: {login_url}")
     
     max_retries = 3
+    
     for attempt in range(1, max_retries + 1):
-        print(f"\n--- Login Attempt {attempt}/{max_retries} ---")
-        try:
-             # Use domcontentloaded instead of networkidle for faster, more reliable loads
-             await page.goto(login_url, wait_until='domcontentloaded', timeout=30000)
-             title = await page.title()
-             print(f"[DEBUG] Navigation successful. Page title: {title}")
-             
-             # Check if already logged in (redirected to dashboard)
-             if "dashboard" in page.url or "tms/me" in page.url:
-                 print("[DEBUG] Already logged in (dashboard found).")
-                 return True
-
-             # Locate fields
-             print("[DEBUG] Locating username field...")
-             try:
-                 # Check for username input
-                 username_loc = page.locator('input[placeholder="Client Code/ User Name"], input[name="username"]').first
-                 await username_loc.wait_for(state='visible', timeout=10000)
-                 await username_loc.fill(username)
-                 
-                 password_loc = page.locator('#password-field, input[name="password"]').first
-                 await password_loc.fill(password)
-                 
-             except Exception as e:
-                 print(f"[DEBUG] Could not find fields: {e}. Refreshing...")
-                 await page.reload()
-                 continue
-
-             # Solve Captcha
-             captcha_text = await solve_captcha(page, api_key)
-             if captcha_text:
-                 print(f"[DEBUG] Filling Captcha with: '{captcha_text}'")
-                 await page.fill("#captchaEnter", captcha_text)
-                 
-                 # Click Login
-                 print("[DEBUG] Clicking Login Button...")
-                 login_btn = page.locator('.login__button').first
-                 await login_btn.click()
-                 
-                 # Wait for transition (dashboard or error check)
-                 print("[DEBUG] Waiting for login transition...")
-                 try:
-                     # Wait for URL change OR error toast
-                     # We wait up to 10s
-                     await page.wait_for_timeout(5000) 
-                     
-                     if "dashboard" in page.url or "tms/me" in page.url:
-                         print("[DEBUG] Login SUCCESS!")
-                         return True
-                     else:
-                         print("[DEBUG] Checking for login errors...")
-                         # Check for toast
-                         toast = page.locator(".toast-message").first
-                         if await toast.is_visible():
-                             err = await toast.text_content()
-                             print(f"[DEBUG] Website Error: {err}")
-                 except Exception as ex:
-                     print(f"Post-login check error: {ex}")
-
-             else:
-                 print("[DEBUG] Captcha failed. Retrying...")
-
-        except Exception as e:
-            print(f"[DEBUG] Error during login attempt: {e}")
-            
-        print("Refreshing page for retry...")
-        print("Refreshing page for retry...")
-        try:
-            await page.reload()
-            await page.wait_for_timeout(2000)
-        except Exception as reload_err:
-             print(f"[CRITICAL] Page crashed during reload: {reload_err}. Returning False to force restart.")
-             return False
+        print(f"\n{'='*50}")
+        print(f"[LOGIN] Attempt {attempt}/{max_retries}")
+        print(f"{'='*50}")
         
+        try:
+            # === STEP 1: Navigate to Login Page ===
+            print("[LOGIN] Step 1: Navigating to login page...")
+            navigation_success = False
+            
+            # Try multiple navigation strategies
+            nav_strategies = [
+                ('domcontentloaded', 20000),
+                ('load', 25000),
+                ('commit', 15000),  # Fastest, just wait for response
+            ]
+            
+            for wait_until, timeout in nav_strategies:
+                try:
+                    await page.goto(login_url, wait_until=wait_until, timeout=timeout)
+                    navigation_success = True
+                    print(f"[LOGIN] Navigation successful (strategy: {wait_until})")
+                    break
+                except Exception as nav_err:
+                    print(f"[LOGIN] Navigation failed with {wait_until}: {str(nav_err)[:80]}")
+                    continue
+            
+            if not navigation_success:
+                print("[LOGIN] All navigation strategies failed. Retrying...")
+                continue
+            
+            # Wait for page to stabilize
+            await page.wait_for_timeout(1000)
+            
+            # === STEP 2: Check if Already Logged In ===
+            current_url = page.url
+            print(f"[LOGIN] Current URL: {current_url}")
+            
+            if "dashboard" in current_url or "tms/me" in current_url or "tms/client" in current_url:
+                print("[LOGIN] ✅ Already logged in (redirected to dashboard)")
+                return True
+            
+            # === STEP 3: Fill Username ===
+            print("[LOGIN] Step 3: Filling username...")
+            username_selectors = [
+                'input[placeholder="Client Code/ User Name"]',
+                'input[name="username"]',
+                'input[formcontrolname="username"]',
+                '#username',
+            ]
+            
+            username_filled = False
+            for selector in username_selectors:
+                try:
+                    username_loc = page.locator(selector).first
+                    if await username_loc.count() > 0:
+                        await username_loc.wait_for(state='visible', timeout=5000)
+                        await username_loc.fill(username)
+                        print(f"[LOGIN] Username filled using: {selector}")
+                        username_filled = True
+                        break
+                except Exception as e:
+                    continue
+            
+            if not username_filled:
+                print("[LOGIN] ❌ Could not find username field")
+                continue
+            
+            # === STEP 4: Fill Password ===
+            print("[LOGIN] Step 4: Filling password...")
+            password_selectors = [
+                '#password-field',
+                'input[name="password"]',
+                'input[type="password"]',
+                'input[formcontrolname="password"]',
+            ]
+            
+            password_filled = False
+            for selector in password_selectors:
+                try:
+                    password_loc = page.locator(selector).first
+                    if await password_loc.count() > 0:
+                        await password_loc.wait_for(state='visible', timeout=5000)
+                        await password_loc.fill(password)
+                        print(f"[LOGIN] Password filled using: {selector}")
+                        password_filled = True
+                        break
+                except Exception as e:
+                    continue
+            
+            if not password_filled:
+                print("[LOGIN] ❌ Could not find password field")
+                continue
+            
+            # === STEP 5: Solve Captcha ===
+            print("[LOGIN] Step 5: Solving captcha...")
+            captcha_text = await solve_captcha(page, api_key)
+            
+            if not captcha_text:
+                print("[LOGIN] ❌ Captcha solving failed")
+                # Refresh to get new captcha
+                await page.reload(wait_until='domcontentloaded', timeout=15000)
+                continue
+            
+            # Fill captcha input
+            captcha_input_selectors = ['#captchaEnter', 'input[name="captcha"]', 'input[placeholder*="Captcha"]']
+            captcha_filled = False
+            
+            for selector in captcha_input_selectors:
+                try:
+                    captcha_input = page.locator(selector).first
+                    if await captcha_input.count() > 0:
+                        await captcha_input.fill(captcha_text)
+                        print(f"[LOGIN] Captcha filled: '{captcha_text}'")
+                        captcha_filled = True
+                        break
+                except:
+                    continue
+            
+            if not captcha_filled:
+                print("[LOGIN] ❌ Could not find captcha input")
+                continue
+            
+            # === STEP 6: Click Login Button ===
+            print("[LOGIN] Step 6: Clicking login button...")
+            login_button_selectors = [
+                '.login__button',
+                'button[type="submit"]',
+                'button.btn-primary:has-text("Login")',
+                'button:has-text("Login")',
+            ]
+            
+            login_clicked = False
+            for selector in login_button_selectors:
+                try:
+                    login_btn = page.locator(selector).first
+                    if await login_btn.count() > 0 and await login_btn.is_visible():
+                        await login_btn.click()
+                        print(f"[LOGIN] Login button clicked: {selector}")
+                        login_clicked = True
+                        break
+                except:
+                    continue
+            
+            if not login_clicked:
+                print("[LOGIN] ❌ Could not click login button")
+                continue
+            
+            # === STEP 7: Wait for Login Result ===
+            print("[LOGIN] Step 7: Waiting for login result...")
+            
+            # Wait for navigation or error
+            try:
+                # Wait for URL change (success) or toast (error)
+                await page.wait_for_timeout(3000)
+                
+                # Check for success
+                current_url = page.url
+                if "dashboard" in current_url or "tms/me" in current_url or "tms/client" in current_url:
+                    print("[LOGIN] ✅ Login SUCCESS!")
+                    return True
+                
+                # Check for error messages
+                error_selectors = ['.toast-message', '.alert-danger', '.error-message', '.swal2-title']
+                for selector in error_selectors:
+                    try:
+                        error_el = page.locator(selector).first
+                        if await error_el.count() > 0 and await error_el.is_visible():
+                            error_text = await error_el.text_content()
+                            print(f"[LOGIN] ⚠️ Error from TMS: {error_text}")
+                            
+                            # Check if it's a captcha error (retry-able)
+                            if error_text and ("captcha" in error_text.lower() or "invalid" in error_text.lower()):
+                                print("[LOGIN] Captcha error - will retry with new captcha")
+                            break
+                    except:
+                        continue
+                
+                # Still on login page - check if login form is still visible
+                if "login" in current_url.lower():
+                    print("[LOGIN] Still on login page - login may have failed")
+                
+            except Exception as wait_err:
+                print(f"[LOGIN] Wait error: {wait_err}")
+            
+        except Exception as e:
+            error_msg = str(e)
+            print(f"[LOGIN] ❌ Exception during attempt: {error_msg[:100]}")
+            
+            # Categorize error for better handling
+            if "net::ERR_ABORTED" in error_msg:
+                print("[LOGIN] Page crash detected - need fresh page")
+                return False  # Signal to main.py to recreate page
+            elif "Timeout" in error_msg:
+                print("[LOGIN] Timeout - TMS server may be slow")
+            elif "Target closed" in error_msg:
+                print("[LOGIN] Browser context closed")
+                return False
+        
+        # === RETRY PREPARATION ===
+        if attempt < max_retries:
+            print(f"[LOGIN] Preparing for retry {attempt + 1}...")
+            try:
+                await page.reload(wait_until='domcontentloaded', timeout=15000)
+                await page.wait_for_timeout(1500)
+            except Exception as reload_err:
+                print(f"[LOGIN] ❌ Reload failed: {reload_err}")
+                # If reload fails, signal for page recreation
+                return False
+    
+    print("[LOGIN] ❌ All login attempts exhausted")
     return False
-
-
