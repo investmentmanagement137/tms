@@ -11,18 +11,28 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
     if "dashboard" not in current_url and "tms" not in current_url:
         print(f"[DEBUG] Current URL {current_url} does not look like dashboard. Attempting nav...")
         dashboard_url = f"{tms_url.rstrip('/')}/tms/client/dashboard"
+        # Use try-except for navigation catch
         try:
             await page.goto(dashboard_url, wait_until='networkidle', timeout=30000)
         except Exception as e:
             print(f"[DEBUG] Navigation failed: {e}")
 
     try:
-        # Increased timeout to 30s
-        await page.wait_for_selector(".card-header, .figure, .total-count", timeout=30000)
-        await page.wait_for_timeout(2000) # Extra buffer for dynamic values
+        # Wait for "Loading..." overlay to go away if it exists
+        try:
+            # Common loading text or spinner classes in TMS
+            await page.wait_for_selector("text=Loading", state="hidden", timeout=10000)
+            await page.wait_for_selector(".loading-overlay", state="hidden", timeout=5000)
+        except:
+             pass # ambiguous, just proceed
+
+        # Changed to state='attached' because logs showed elements were 'hidden' but present
+        # We can extract text from hidden DOM elements via JS
+        await page.wait_for_selector(".card-header, .figure", state='attached', timeout=30000)
+        await page.wait_for_timeout(2000) # Extra buffer 
     except Exception as e:
-        print(f"[DEBUG] Error loading dashboard elements: {e}")
-        # We don't return here, we try extraction anyway, it might partially work or we catch it below
+        print(f"[DEBUG] Error loading dashboard elements (Attached check): {e}")
+        # Proceed to extraction anyway, maybe JS can still find them
         
     print("Extracting dashboard data...")
 
