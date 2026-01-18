@@ -133,6 +133,12 @@ async def perform_login(page, username, password, api_key, tms_url):
                     return True
                 except:
                     print(f"[LOGIN] ⚠️ URL says dashboard but no elements found. Assuming false positive (Login needed).")
+                    # Force navigation back to login page because we are stuck on a broken /dashboard view
+                    try:
+                        print(f"[LOGIN] Redirecting to {login_url} to ensure login form loads...")
+                        await page.goto(login_url, wait_until='domcontentloaded', timeout=20000)
+                    except Exception as nav_e:
+                        print(f"[LOGIN] Failed to redirect to login: {nav_e}")
                     # Fall through to login inputs
             
             # === STEP 3: Fill Username ===
