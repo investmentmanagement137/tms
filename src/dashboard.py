@@ -28,12 +28,19 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
             marketStatus: "Unknown"
         };
         
-        // Helper to clean text
-        const clean = (text) => text ? text.replace(/[\\n\\t]/g, '').trim() : '';
+        // Helper to clean text and remove potential tooltips
+        const clean = (el) => {
+            if (!el) return '';
+            const clone = el.cloneNode(true);
+            // Remove tooltips or unwanted nested elements if necessary
+            clone.querySelectorAll('.tooltiptext, .tooltip__utilize, .tooltip__available').forEach(e => e.remove());
+            return clone.textContent.replace(/[\\n\\t]/g, '').trim();
+        };
 
         // Helper to find specific card by header text
         const findCard = (headerText) => {
-            const headers = Array.from(document.querySelectorAll('.card-header, .card-title, h5'));
+            // Find all potential headers
+            const headers = Array.from(document.querySelectorAll('.card-title, h5, .card-header'));
             const header = headers.find(el => el.textContent.includes(headerText));
             return header ? header.closest('.card') : null;
         };
@@ -41,72 +48,52 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
         // --- 1. My Trade Summary ---
         const tradeCard = findCard("My Trade Summary");
         if (tradeCard) {
-            // "Total Turnover" is often the main figure
-            const mainVal = tradeCard.querySelector('.figure-value');
-            if (mainVal) result.tradeSummary['Total Turnover'] = clean(mainVal.textContent);
+            // "Total Turnover" is in .total-count .h4
+            const totalEl = tradeCard.querySelector('.total-count .h4');
+            if (totalEl) result.tradeSummary['Total Turnover'] = clean(totalEl);
             
-            // Other items are in .figure blocks or rows
+            // Other items are in .figure blocks
             tradeCard.querySelectorAll('.figure').forEach(fig => {
-                const label = clean(fig.querySelector('.figure-label')?.textContent);
-                const value = clean(fig.querySelector('.figure-value')?.textContent);
-                if (label && value) result.tradeSummary[label] = value;
+                const labelEl = fig.querySelector('.figure-label');
+                const valueEl = fig.querySelector('.figure-value');
+                if (labelEl && valueEl) {
+                    const label = clean(labelEl);
+                    const value = clean(valueEl);
+                    result.tradeSummary[label] = value;
+                }
             });
         }
 
         // --- 2. My Collateral Summary ---
         const colCard = findCard("My Collateral Summary");
         if (colCard) {
-             const mainVal = colCard.querySelector('.figure-value');
-             if (mainVal) result.collateralSummary['Total Collateral'] = clean(mainVal.textContent);
+             // "Total Collateral" is in .total-count .h4
+             const totalEl = colCard.querySelector('.total-count .h4');
+             if (totalEl) result.collateralSummary['Total Collateral'] = clean(totalEl);
              
-             // Utilized / Available are often in separate smaller blocks or labeled spans
-             // Inspect showed labels like "Collateral Utilized"
-             colCard.querySelectorAll('div, span').forEach(el => {
-                 const text = clean(el.textContent);
-                 if (text === "Collateral Utilized") {
-                     // Value is likely next sibling or in parent's next sibling
-                     const val = el.parentElement.querySelector('.text-bold, .figure-value, span:nth-child(2)');
-                     if(val) result.collateralSummary['Utilized'] = clean(val.textContent);
-                 }
-                 if (text === "Collateral Available") {
-                     const val = el.parentElement.querySelector('.text-bold, .figure-value, span:nth-child(2)');
-                     if(val) result.collateralSummary['Available'] = clean(val.textContent);
-                 }
-             });
-             
-             // Fallback: Check .figure loop if standard structure
+             // Extract items from figures
              colCard.querySelectorAll('.figure').forEach(fig => {
-                const label = clean(fig.querySelector('.figure-label')?.textContent);
-                const value = clean(fig.querySelector('.figure-value')?.textContent);
-                if (label && value) result.collateralSummary[label] = value;
+                const labelEl = fig.querySelector('.figure-label');
+                const valueEl = fig.querySelector('.figure-value');
+                if (labelEl && valueEl) {
+                    const label = clean(labelEl);
+                    const value = clean(valueEl);
+                    result.collateralSummary[label] = value;
+                }
             });
         }
 
         // --- 3. Fund Summary ---
         const fundCard = findCard("Fund Summary");
         if (fundCard) {
-            fundCard.querySelectorAll('.row > div').forEach(col => {
-                 // Often formatted as Label ... Value or Label [Value]
-                 // We look for specific known labels:
-                 const text = clean(col.textContent);
-                 if (text.includes("Collateral Amount")) {
-                     const val = col.querySelector('.figure-value, .hover-over');
-                     if(val) result.fundSummary['Collateral Amount'] = clean(val.textContent);
-                 }
-                 if (text.includes("Net Receivable")) {
-                     const val = col.querySelector('.figure-value, .hover-over');
-                     if(val) result.fundSummary['Net Receivable'] = clean(val.textContent);
-                 }
-                 if (text.includes("Net Payable")) {
-                     const val = col.querySelector('.figure-value, .hover-over');
-                     if(val) result.fundSummary['Net Payable'] = clean(val.textContent);
-                 }
-            });
-            // Try generic figure capture for Fund Card too
             fundCard.querySelectorAll('.figure').forEach(fig => {
-                const label = clean(fig.querySelector('.figure-label')?.textContent);
-                const value = clean(fig.querySelector('.figure-value')?.textContent);
-                if (label && value) result.fundSummary[label] = value;
+                const labelEl = fig.querySelector('.figure-label');
+                const valueEl = fig.querySelector('.figure-value');
+                if (labelEl && valueEl) {
+                    const label = clean(labelEl);
+                    const value = clean(valueEl);
+                    result.fundSummary[label] = value;
+                }
             });
         }
 

@@ -6,39 +6,31 @@ def parse():
         
     soup = BeautifulSoup(html, 'html.parser')
     
-    print("--- Parsing Dashboard Dump ---")
+    print("--- Parsing Dashboard Dump (Context Hunt) ---")
     
-    # Strategy 1: Look for "data__summary" items (Top bar stats)
-    summary_items = soup.select(".data__summary--item")
-    print(f"Found {len(summary_items)} summary items.")
-    
-    for item in summary_items:
-        try:
-            label = item.find('span').get_text(strip=True)
-            # The number is usually in a class like "data__summary--num" or just the second span
-            num_span = item.select_one(".data__summary--num")
-            value = num_span.get_text(strip=True) if num_span else "N/A"
-            print(f"Summary: {label} = {value}")
-        except Exception as e:
-            print(f"Skipping item: {e}")
-            
-    # Strategy 2: Look for collateral/limit specific boxes
-    # Often in TMS there are boxes for "Collateral", "Trade Limit"
-    
-    print("\n--- Searching for Boxes ---")
-    boxes = soup.select(".box")
-    for box in boxes:
-        title_el = box.select_one(".box__title h2")
-        if title_el:
-            title = title_el.get_text(strip=True)
-            print(f"Box: {title}")
-            # Try to grab table data inside
-            rows = box.select("tbody tr")
-            if rows:
-                print(f"  - Found {len(rows)} rows of data")
-                for row in rows[:3]: # First 3
-                    cols = [c.get_text(strip=True) for c in row.find_all('td')]
-                    print(f"    {cols}")
+    # helper
+    def find_parent_classes(text_query, dump_html=False):
+        print(f"\nSearching for '{text_query}'...")
+        # Find element containing text
+        element = soup.find(string=lambda t: t and text_query in t)
+        if element:
+            print(f"Found text node: {element.strip()}")
+            parent = element.parent
+            while parent and parent.name != 'body':
+                classes = parent.get('class', [])
+                if 'card' in classes:
+                    print(f"    -> Found Card container! Dumping HTML to {text_query}_card.html")
+                    if dump_html:
+                        with open(f"{text_query.replace(' ', '_')}_card.html", "w", encoding="utf-8") as f:
+                            f.write(parent.prettify())
+                    return # Stop after finding the card
+                parent = parent.parent
+        else:
+            print("Text not found.")
+
+    find_parent_classes("My Trade Summary", dump_html=True)
+    find_parent_classes("My Collateral Summary", dump_html=True)
+    find_parent_classes("Fund Summary", dump_html=True)
 
 if __name__ == "__main__":
     parse()
