@@ -53,10 +53,27 @@ async def main():
         
         # Use simple async_playwright manager
         async with async_playwright() as p:
-            # Launch browser
-            # headless=True is default in docker, but let's respect env or default
-            browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-            context = await browser.new_context(viewport={'width': 1920, 'height': 1080})
+            # Launch browser with Stealth Args
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox', 
+                    '--disable-setuid-sandbox',
+                    '--disable-blink-features=AutomationControlled', # Key for evasion
+                    '--disable-infobars',
+                    '--window-size=1920,1080',
+                ]
+            )
+            
+            # Create Context with User Agent
+            context = await browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+            )
+            
+            # Stealth Script: Hide webdriver property
+            await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
             page = await context.new_page()
             
             try:
