@@ -9,7 +9,7 @@ from apify import Actor
 from playwright.async_api import async_playwright
 
 # Import modular scripts
-from src import utils, login, buy_stock, sell_stock, daily_history
+from src import utils, login, buy_stock, sell_stock, daily_history, dashboard
 
 
 async def main():
@@ -130,6 +130,18 @@ async def main():
                     Actor.log.info("Saving session state to 'tms-sessions'...")
                     storage_state = await context.storage_state()
                     await session_store.set_value('SESSION', storage_state)
+                
+                # 5. Extract Dashboard Data (Collateral, Limits)
+                # We are logged in now (either via session or fresh login)
+                Actor.log.info("Extracting Dashboard Data...")
+                try:
+                    # Ensure we are on dashboard or navigate there?
+                    # extract_dashboard_data runs on current page
+                    dash_data = await dashboard.extract_dashboard_data(page)
+                    final_output["dashboard"] = dash_data
+                    Actor.log.info("Dashboard data extracted.")
+                except Exception as e:
+                     Actor.log.warning(f"Dashboard extraction failed: {e}")
                 
                 final_output = {
                     "version": VERSION,

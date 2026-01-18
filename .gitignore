@@ -51,3 +51,6 @@ captcha.png
 # OS
 .DS_Store
 Thumbs.db
+
+dashboard_dump.html
+structure.txt

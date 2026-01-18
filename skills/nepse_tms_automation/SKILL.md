@@ -81,3 +81,14 @@ TMS uses basic fingerprinting and WAF rules.
 | `403 Forbidden` | WAF detection / Bad User Agent | Enable Stealth args & Init Script. |
 | `Page crashed` | Browser OOM or bad state | catch `page.reload()` errors and restart context. |
 | `Net::ERR_ABORTED` | Session invalid mid-request | Clear cookies and re-login. |
+
+## 📝 Dashboard Data Extraction
+
+*   **URL**: `{BASE_URL}/tms/m/dashboard`
+*   **Method**: `page.evaluate()` to scrape dynamic Angular text content.
+*   **Key Selectors**:
+    *   **Collateral Amount**: `span.figure-label` containing "Collateral Amount" -> sibling `span.figure-value`.
+    *   **Utilized Collateral**: `span.figure-label` containing "Collateral Utilized" -> sibling `span.figure-value`.
+    *   **Available Collateral**: `span.figure-label` containing "Collateral Available" -> sibling `span.figure-value`.
+    *   **Trading Limits**: Extracted from `span.tooltiptext` elements containing "Utilized Trading Limit" or "Available Trading Limit".
+
