@@ -125,13 +125,13 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         # Find and click the submit button more robustly
         submit_clicked = False
         
-        # Try multiple selectors for submit button
+        # The submit button is within the order entry form - target specifically
+        # It's a btn-primary btn-lg that is NOT disabled and is AFTER the price input
         submit_selectors = [
-            "button.btn-primary.btn-lg",  # Main submit button
-            "button.btn-sm.btn-primary:not(.btn-default)",
-            "button[type='submit'].btn-primary",
-            "button:has-text('BUY')",
-            "button.btn-primary:visible"
+            ".box-order-entry button.btn-primary.btn-lg:not([disabled])",  # Within order entry box
+            "form button.btn-primary.btn-lg:not([disabled])",  # Within any form
+            ".order-entry-form button.btn-primary:not([disabled])",
+            "button.btn-primary.btn-lg:not([disabled]):not(:has-text('Update')):not(:has-text('Close'))",
         ]
         
         for selector in submit_selectors:
@@ -142,23 +142,47 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                     print(f"[DEBUG] Clicked submit button with selector: {selector}")
                     submit_clicked = True
                     break
-            except:
+            except Exception as e:
+                print(f"[DEBUG] Selector {selector} failed: {str(e)[:50]}")
                 continue
         
         if not submit_clicked:
-            print("[DEBUG] Submit button not found via locators, trying JS force click...")
-            await page.evaluate("""() => {
-                const btns = document.querySelectorAll('button.btn-primary, button.btn-sm');
-                for (const btn of btns) {
-                    if (!btn.disabled && btn.offsetParent !== null) {
-                        btn.click();
-                        console.log('Force clicked:', btn.className);
-                        return true;
+            print("[DEBUG] Submit button not found via locators, trying targeted JS click...")
+            # More targeted JS - find button after price input within form
+            result = await page.evaluate("""() => {
+                // Find the price input first
+                const priceInput = document.querySelector('input.form-price, input[formcontrolname="price"]');
+                if (priceInput) {
+                    // Find the closest form or container
+                    const container = priceInput.closest('.box-order-entry, form, .order-form');
+                    if (container) {
+                        // Find the primary submit button in this container
+                        const btn = container.querySelector('button.btn-primary.btn-lg:not([disabled])');
+                        if (btn) {
+                            btn.click();
+                            console.log('Clicked submit button in form container');
+                            return {success: true, btnClass: btn.className};
+                        }
                     }
                 }
-                return false;
+                
+                // Fallback: Find the first visible, non-disabled btn-primary.btn-lg
+                const btns = document.querySelectorAll('button.btn-primary.btn-lg:not([disabled])');
+                for (const btn of btns) {
+                    const text = btn.innerText.trim().toLowerCase();
+                    // Skip buttons with known non-submit text
+                    if (!text || (!text.includes('update') && !text.includes('close') && !text.includes('cancel'))) {
+                        if (btn.offsetParent !== null) {  // Is visible
+                            btn.click();
+                            console.log('Clicked fallback button:', btn.className);
+                            return {success: true, btnClass: btn.className, fallback: true};
+                        }
+                    }
+                }
+                return {success: false};
             }""")
-            submit_clicked = True
+            print(f"[DEBUG] JS click result: {result}")
+            submit_clicked = result.get('success', False) if result else False
         
         # === STEP 7: Handle Confirmation Dialog (SweetAlert) ===
         print("[DEBUG] Step 7: Checking for confirmation dialog...")
