@@ -1,116 +1,66 @@
 # TMS Order Executor 🚀
 
-Automated trading actor for NEPSE TMS (Trade Management System). Supports **Buying**, **Selling**, and **Order Verification** (Order Book extraction).
+Automated trading actor for NEPSE TMS (Trade Management System). Built with **Playwright** for speed and stability.
 
 ---
 
 ## ✨ Features
 
-- **Buy & Sell**: Execute orders automatically.
-- **Batch Trading**: Place multiple orders (Buy/Sell mix) in a single run.
-- **Verification**: Automatically scrapes "Today's Order Book" after trading to verify order status (Optional).
-- **CAPTCHA Solving**: Uses Google Gemini AI to solve TMS login CAPTCHAs.
-- **S3 Upload**: Optionally uploads result JSON to Supabase Storage.
-- **Versioning**: Logs version numbers for tracking.
+- **⚡ Fast Execution**: Uses **Session Persistence** to skip Login & Captcha on repeat runs!
+- **🤖 Smart Login**: Solves CAPTCHAs automatically using **Google Gemini AI**.
+- **📦 Batch Trading**: Place multiple BUY/SELL orders in one go (JSON input).
+- **🛡️ Stealth Mode**: Bypasses basic bot detection (403 Forbidden).
+- **✅ Verification**: Optionally scrapes "Today's Order Book" to confirm orders.
 
 ---
 
-## 📥 Input Schema
+## 📥 Input Guide
 
-| Field | Type | Description | Required | Default |
-|-------|------|-------------|:--------:|:-------:|
-| `tmsUrl` | String | Full Broker URL (e.g., `https://tms58.nepsetms.com.np`) | ✅ | - |
-| `tmsUsername` | String | TMS Login Username | ✅ | - |
-| `tmsPassword` | String | TMS Login Password | ✅ | - |
-| `geminiApiKey` | String | Google Gemini API Key (for CAPTCHA) | ✅ | - |
-| `action` | String | `BUY`, `SELL`, or `BATCH`. | ✅ | `BATCH` |
-| `symbol` | String | Stock Symbol (Single Mode) | ⚠️ | - |
-| `price` | Number | Price per unit (Single Mode) | ⚠️ | - |
-| `quantity` | Integer | Number of units (Single Mode) | ⚠️ | - |
-| `orders` | Array | **Batch Mode**: List of orders to execute. | ❌ | `[]` |
-| `checkOrders` | Boolean | Scrape Order Book after trading? | ❌ | `true` |
-| `uploadToS3` | Boolean | Upload result to Supabase? | ❌ | `true` |
+### 1. Credentials (Recommended: Use Saved Tasks)
+To avoid sending sensitive data in every API call, create a **Saved Task** on Apify and safely store:
+*   `tmsUrl`: Your broker URL (e.g., `https://tms58.nepsetms.com.np`)
+*   `tmsUsername`: Client Code
+*   `tmsPassword`: Password
+*   `geminiApiKey`: Google Gemini API Key
 
-### Batch `orders` Structure
-Use this for **Multiple Buys** or **Rebalancing**.
+### 2. Action Modes
 
+| Action | Description | Required Inputs |
+|:---:|---|---|
+| **BATCH** | Execute a list of orders. | `orders` (Array) |
+| **BUY** | Place a single buy order. | `symbol`, `quantity`, `price` |
+| **SELL** | Place a single sell order. | `symbol`, `quantity`, `price` |
+
+### 3. Batch Orders Example (`orders` array)
 ```json
 [
-  {
-    "symbol": "NICA",
-    "qty": 10,
-    "price": 450,
-    "side": "BUY"
-  },
-  {
-    "symbol": "HIDCL",
-    "qty": 50,
-    "price": 200,
-    "side": "SELL"
-  }
+  { "symbol": "NICA", "qty": 10, "price": 450, "side": "BUY" },
+  { "symbol": "HIDCL", "qty": 50, "price": 200, "side": "SELL" }
 ]
 ```
 
-### Single Mode Inputs
-If `orders` is empty, the actor uses:
-- `symbol`
-- `price`
-- `quantity`
-- `action` (BUY/SELL)
+---
+
+## ⚡ Session Persistence
+This actor automatically saves your login session (Cookies/Local Storage) to a private store (`tms-sessions`).
+*   **Run 1**: Logs in (takes ~20s). Saves Session.
+*   **Run 2+**: **Skips Login** (takes ~3s). Trades immediately.
+
+*Note: Sessions usually expire after a few hours. The actor handles re-login automatically.*
 
 ---
 
-## 📤 Output Schema
+## 📤 Output
+Returns a JSON object with status and order details:
 
-The actor produces a JSON result.
-
-### Example Output
 ```json
 {
     "version": "1.1.0",
     "status": "SUCCESS",
-    "timestamp": "2026-01-18 12:00:00.000",
     "batch_results": [
-        {
-            "status": "SUBMITTED",
-            "message": "Order submitted successfully",
-            "buyEntryUrl": "...",
-            "orderDetails": {
-                "symbol": "NICA",
-                "quantity": 10,
-                "price": 450,
-                "action": "BUY"
-            }
-        }
+        { "status": "SUBMITTED", "symbol": "NICA", "action": "BUY", ... }
     ],
-    "todaysOrderPage": [
-        {
-            "Order No": "12345",
-            "Symbol": "NICA",
-            "Type": "BUY",
-            "Qty": "10",
-            "Price": "450",
-            "Status": "OPEN"
-        }
-    ]
+    "todaysOrderPage": [ ... ]
 }
 ```
 
----
-
-## 🛠️ Setup & Security
-
-1. **Credentials**: It is highly recommended to save `tmsUsername`, `tmsPassword`, `geminiApiKey`, and `tmsUrl` in the **Apify Actor Inputs** configuration to avoid passing them in every API call.
-2. **Proxies**: Uses Apify Proxy (auto-configured) if available, or direct connection.
-3. **Timeouts**: Default timeout is set to handle slow NEPSE servers.
-
----
-
-## 🆘 Troubleshooting
-
-- **Login Failed?**: Check `geminiApiKey` quota or invalid credentials. Use `HEADLESS=false` locally to debug.
-- **404 Errors?**: Ensure `tmsUrl` is correct (e.g. `https://tms58.nepsetms.com.np`) and does NOT end with `/login` (the actor handles path construction).
-- **Schema Errors?**: Ensure `orders` array items have all fields (`symbol`, `qty`, `price`, `side`).
-
----
-v1.1.0
