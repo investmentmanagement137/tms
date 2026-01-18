@@ -31,19 +31,47 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         # 1. Select Instrument Type FIRST
         print(f"[DEBUG] Step 1: Selecting Instrument: {instrument}")
+        instrument_selected = False
         try:
-            # Wait for dropdown to be attached and visible
+            # Try standard Playwright selection first
             inst_selector = "select.form-inst, select[formcontrolname='instType']"
-            await page.wait_for_selector(inst_selector, state="visible", timeout=10000)
-
-            inst_select = page.locator(inst_selector).first
-            if await inst_select.is_visible():
+            try:
+                await page.wait_for_selector(inst_selector, state="visible", timeout=5000)
+                inst_select = page.locator(inst_selector).first
                 await inst_select.select_option(label=instrument)
-                print(f"[DEBUG] Instrument selected: {instrument}")
-            else:
-                print("[DEBUG] WARNING: Instrument dropdown not visible after wait!")
+                print(f"[DEBUG] Instrument selected via UI: {instrument}")
+                instrument_selected = True
+            except Exception as e:
+                print(f"[DEBUG] UI selection timed out/failed: {e}")
+            
+            # Fallback: JavaScript direct injection (Force for Angular)
+            if not instrument_selected:
+                print("[DEBUG] Attempting JS fallback for Instrument...")
+                found = await page.evaluate(f"""() => {{
+                    const select = document.querySelector("{inst_selector}");
+                    if (!select) return false;
+                    
+                    // Try to find the option by text
+                    for (let i = 0; i < select.options.length; i++) {{
+                        if (select.options[i].text === "{instrument}") {{
+                            select.selectedIndex = i;
+                            select.value = select.options[i].value;
+                            select.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                            select.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            return true;
+                        }}
+                    }}
+                    return false;
+                }}""")
+                
+                if found:
+                    print(f"[DEBUG] Instrument selected via JS: {instrument}")
+                    instrument_selected = True
+                else:
+                    print("[DEBUG] CRITICAL WARNING: Could not select instrument via JS either!")
+
         except Exception as inst_err:
-            print(f"[DEBUG] Instrument selection failed: {inst_err}")
+            print(f"[DEBUG] Instrument selection completely failed: {inst_err}")
         
         await page.wait_for_timeout(300)
 
