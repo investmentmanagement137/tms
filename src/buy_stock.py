@@ -70,35 +70,51 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         await page.wait_for_timeout(300)
         
-        # 3. Enter Symbol
+        # 3. Enter Symbol (CRITICAL: Must click from typeahead dropdown!)
         print(f"[DEBUG] Step 3: Entering Symbol: {symbol}")
-        # FIX: input.form-control.form-control-sm was matching disabled Client Name field!
-        # Use specific formcontrolname='symbol' selector instead
-        symbol_selectors = [
-            "input[formcontrolname='symbol']",     # Primary: specific to symbol field
-            "input[ng-reflect-name='symbol']",    # Angular alternative
-            "input[placeholder*='Symbol']",        # By placeholder
-        ]
         
-        symbol_filled = False
-        for sel in symbol_selectors:
-            try:
-                symbol_input = page.locator(sel).first
-                if await symbol_input.is_visible():
-                    await symbol_input.click()
-                    await symbol_input.fill(symbol)
-                    symbol_filled = True
-                    print(f"[DEBUG] Symbol filled using: {sel}")
-                    break
-            except:
-                pass
+        # Use specific formcontrolname='symbol' selector
+        symbol_input = page.locator("input[formcontrolname='symbol']").first
         
-        if not symbol_filled:
-            print("[DEBUG] WARNING: Could not fill symbol field!")
+        if await symbol_input.is_visible():
+            await symbol_input.click()
+            await symbol_input.fill("")  # Clear first
+            await symbol_input.type(symbol, delay=100)  # Type slowly to trigger typeahead
+            print(f"[DEBUG] Symbol typed: {symbol}")
+            
+            # CRITICAL: Wait for typeahead dropdown to appear and click the item
+            await page.wait_for_timeout(1500)  # Wait for dropdown to populate
+            
+            # Try multiple selectors for the dropdown item
+            dropdown_selectors = [
+                f".dropdown-menu li a:has-text('{symbol}')",  # Exact match in dropdown
+                ".dropdown-menu li a",                         # First dropdown item
+                ".typeahead-item",                             # Alternative typeahead
+                f"li:has-text('{symbol}') a",                 # Generic list item
+            ]
+            
+            dropdown_clicked = False
+            for sel in dropdown_selectors:
+                try:
+                    dropdown_item = page.locator(sel).first
+                    if await dropdown_item.is_visible(timeout=1000):
+                        await dropdown_item.click()
+                        dropdown_clicked = True
+                        print(f"[DEBUG] Symbol selected from dropdown using: {sel}")
+                        break
+                except:
+                    pass
+            
+            if not dropdown_clicked:
+                # Fallback: press Tab then Enter (old method)
+                print("[DEBUG] Dropdown not found, using Tab+Enter fallback")
+                await page.keyboard.press("Tab")
+                await page.wait_for_timeout(500)
+                await page.keyboard.press("Enter")
+        else:
+            print("[DEBUG] WARNING: Symbol input not visible!")
         
-        await page.keyboard.press("Tab")
-        await page.wait_for_timeout(1500)  # Wait for symbol autocomplete
-        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(500)
         print("[DEBUG] Symbol entry complete")
         
         await page.wait_for_timeout(500)
