@@ -1,5 +1,5 @@
 import time
-import csv
+import time
 import datetime
 import os
 from selenium.webdriver.common.by import By

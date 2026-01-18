@@ -2,7 +2,7 @@
 Apify Actor entry point for TMS Trade Book Scraper
 """
 import os
-import csv
+import os
 import datetime
 import boto3
 from apify import Actor
@@ -16,8 +16,8 @@ from src import utils
 from src import tms_client
 
 
-def upload_to_supabase(csv_filename, endpoint, region, access_key, secret_key, bucket_name):
-    """Upload CSV file to Supabase S3"""
+def upload_to_supabase(file_path, endpoint, region, access_key, secret_key, bucket_name):
+    """Upload file to Supabase S3"""
     try:
         session = boto3.session.Session()
         s3 = session.client(
@@ -28,11 +28,11 @@ def upload_to_supabase(csv_filename, endpoint, region, access_key, secret_key, b
             aws_secret_access_key=secret_key
         )
         
-        print(f"Uploading {csv_filename} to bucket: {bucket_name}")
-        with open(csv_filename, "rb") as f:
-            s3.upload_fileobj(f, bucket_name, csv_filename)
+        print(f"Uploading {file_path} to bucket: {bucket_name}")
+        with open(file_path, "rb") as f:
+            s3.upload_fileobj(f, bucket_name, file_path)
             
-        print(f"Success! File '{csv_filename}' uploaded successfully.")
+        print(f"Success! File '{file_path}' uploaded successfully.")
         return True
         
     except Exception as e:
