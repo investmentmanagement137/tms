@@ -39,34 +39,31 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     }
     
     try:
-        # === VERIFIED SELECTORS FROM BROWSER EXPLORATION ===
-        # 1. Click BUY toggle FIRST (required - form won't work in neutral state)
-        print("[DEBUG] Step 1: Clicking BUY toggle...")
-        buy_toggle = page.locator(".order__options--buy")
-        if await buy_toggle.is_visible():
-            await buy_toggle.click()
-            print("[DEBUG] BUY toggle clicked via .order__options--buy")
-        else:
-            # Fallback to text selector
-            await page.locator("text=BUY").first.click()
-            print("[DEBUG] BUY toggle clicked via text=BUY")
+        # === CORRECT ORDER: Instrument -> Toggle -> Form Fields ===
+        
+        # 1. Select Instrument Type FIRST (CRITICAL for MF like NIBLSTF)
+        print(f"[DEBUG] Step 1: Selecting Instrument: {instrument}")
+        try:
+            inst_select = page.locator("select.form-inst, select[formcontrolname='instType']").first
+            if await inst_select.is_visible():
+                await inst_select.select_option(label=instrument)
+                print(f"[DEBUG] Instrument selected: {instrument}")
+            else:
+                print("[DEBUG] WARNING: Instrument dropdown not visible!")
+        except Exception as inst_err:
+            print(f"[DEBUG] Instrument selection failed: {inst_err}")
         
         await page.wait_for_timeout(300)
         
-        # 2. Select Instrument Type (CRITICAL for MF like NIBLSTF)
-        print(f"[DEBUG] Step 2: Selecting Instrument: {instrument}")
-        try:
-            # Verified selector: select.form-inst
-            inst_select = page.locator("select.form-inst")
-            if await inst_select.is_visible():
-                await inst_select.select_option(label=instrument)
-                print(f"[DEBUG] Instrument selected via select.form-inst: {instrument}")
-            else:
-                # Fallback
-                await page.select_option("select[formcontrolname='instType']", label=instrument)
-                print(f"[DEBUG] Instrument selected via formcontrolname")
-        except Exception as inst_err:
-            print(f"[DEBUG] Instrument selection failed: {inst_err}")
+        # 2. Click BUY toggle (required - form won't work in neutral state)
+        print("[DEBUG] Step 2: Clicking BUY toggle...")
+        buy_toggle = page.locator(".order__options--buy")
+        if await buy_toggle.is_visible():
+            await buy_toggle.click()
+            print("[DEBUG] BUY toggle clicked")
+        else:
+            await page.locator("text=BUY").first.click()
+            print("[DEBUG] BUY toggle clicked via text=BUY")
         
         await page.wait_for_timeout(300)
         
