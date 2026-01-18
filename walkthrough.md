@@ -271,11 +271,15 @@ curl --request POST \
     "symbol": "NICA",
     "buyQuantity": 10,
     "buyPrice": 450,
+    "checkOrders": true,
     "tmsUsername": "YOUR_USERNAME",
     "tmsPassword": "YOUR_PASSWORD",
     "geminiApiKey": "YOUR_GEMINI_KEY"
 }'
 ```
+
+> **New Feature**: Set `"checkOrders": false` to skip the post-buy order book verification. Default is `true`.
+
 
 ### 2. Check Daily Orders (Example)
 ```bash
@@ -291,5 +295,26 @@ curl --request POST \
 }'
 ```
 
-> **Note**: For security, it is recommended to store sensitive values (passwords, keys) in **Apify Secrets** or defaults if possible, but you can pass them in the body as shown above for full control.
+### 3. Secure Usage (Recommended)
+**Is adding credential here safe?**
+Passing credentials in the command line can be risky (history logs). 
+**Best Practice**:
+1.  Go to the **Apify Console** > **Actor** > **Inputs**.
+2.  Enter your `tmsUsername`, `tmsPassword`, and `geminiApiKey` there and **Save**.
+3.  Now, your API requests only need the trading details! The actor will use the saved values for the rest.
+
+**Secure Payload Example:**
+```bash
+curl --request POST \
+  --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "tmsUrl": "https://tms58.nepsetms.com.np",
+    "action": "BUY",
+    "symbol": "NICA",
+    "buyQuantity": 10,
+    "buyPrice": 450
+}'
+```
+*Credentials are automatically pulled from your saved Actor configuration.*
 
