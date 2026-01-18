@@ -88,10 +88,28 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         await page.wait_for_timeout(500)
         
-        # 6. Click Submit
+        # 6. Click BUY toggle (required - neutral state won't submit)
+        print("[DEBUG] Clicking BUY toggle...")
+        # The toggle is a SELL/BUY switch - must click the BUY side
+        try:
+            # Look for BUY label/button near toggle, or the toggle itself when it has BUY text
+            buy_toggle = page.locator("text=BUY").first
+            if await buy_toggle.is_visible():
+                await buy_toggle.click()
+                print("[DEBUG] Clicked BUY toggle")
+            else:
+                # Fallback: try toggle switch with .buy class or similar
+                toggle = page.locator(".toggle-buy, .buy-toggle, label:has-text('BUY')").first
+                if await toggle.is_visible():
+                    await toggle.click()
+                    print("[DEBUG] Clicked BUY toggle (fallback)")
+        except Exception as e:
+            print(f"[DEBUG] Toggle click attempt: {e}")
+        
+        await page.wait_for_timeout(300)
+        
+        # 7. Click Submit
         print("[DEBUG] Clicking Buy Button...")
-        # Locating the primary submit button
-        # Usually type=submit or class btn-primary
         submit_btn = page.locator("button[type='submit'], button.btn-primary, button.btn-success").first
         await submit_btn.click()
         print("[DEBUG] Clicked Submit.")

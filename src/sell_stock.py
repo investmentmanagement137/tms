@@ -66,7 +66,24 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         await page.wait_for_timeout(500)
         
-        # 6. Click Submit (Sell Button)
+        # 6. Click SELL toggle (required - neutral state won't submit)
+        print("[DEBUG] Clicking SELL toggle...")
+        try:
+            sell_toggle = page.locator("text=SELL").first
+            if await sell_toggle.is_visible():
+                await sell_toggle.click()
+                print("[DEBUG] Clicked SELL toggle")
+            else:
+                toggle = page.locator(".toggle-sell, .sell-toggle, label:has-text('SELL')").first
+                if await toggle.is_visible():
+                    await toggle.click()
+                    print("[DEBUG] Clicked SELL toggle (fallback)")
+        except Exception as e:
+            print(f"[DEBUG] Toggle click attempt: {e}")
+        
+        await page.wait_for_timeout(300)
+        
+        # 7. Click Submit (Sell Button)
         print("[DEBUG] Clicking Sell Button...")
         submit_btn = page.locator("button[type='submit'], button.btn-primary, button.btn-danger, button.btn-success").first
         await submit_btn.click()
