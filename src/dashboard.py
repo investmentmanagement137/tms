@@ -16,14 +16,15 @@ async def extract_dashboard_data(page: Page) -> dict:
         const result = {
             collateral: {},
             limits: {},
-            summary_items: []
+            summary_items: [],
+            marketStatus: "Unknown"
         };
 
         // Helper to clean text
         const clean = (text) => text ? text.replace(/[\\n\\t]/g, '').trim() : '';
 
-        // 1. Extract .figure items (Collateral, etc.)
-        // Structure: div.figure > span.figure-label, span.figure-value
+        // 1. Extract .figure items (Collateral, Trade Summary, etc.)
+        // Validated structure: div.figure > span.figure-label, span.figure-value
         const figures = document.querySelectorAll('.figure');
         figures.forEach(fig => {
             const labelEl = fig.querySelector('.figure-label');
@@ -32,44 +33,48 @@ async def extract_dashboard_data(page: Page) -> dict:
                 const label = clean(labelEl.textContent);
                 const value = clean(valEl.textContent);
                 
+                // Collateral
                 if (label.includes('Collateral Amount')) result.collateral.amount = value;
                 if (label.includes('Collateral Utilized')) result.collateral.utilized = value;
                 if (label.includes('Collateral Available')) result.collateral.available = value;
-            }
-        });
-
-        // 2. Extract Trading Limits from Tooltips or Chart Items
-        // The structure dump showed 'Available Trading Limit: ...' inside .tooltiptext
-        // usually found inside .line-chart .chart-item
-        const tooltips = document.querySelectorAll('.tooltiptext');
-        tooltips.forEach(tt => {
-            const text = clean(tt.textContent);
-            if (text.includes('Utilized Trading Limit')) {
-                result.limits.utilized = text.split(':').pop().trim();
-            }
-            if (text.includes('Available Trading Limit')) {
-                result.limits.available = text.split(':').pop().trim();
-            }
-        });
-
-        // 3. Extract Summary Items (Top bar or other boxes)
-        // Try .data__summary--item if they exist (dump said 0, but logic stays just in case)
-        document.querySelectorAll('.data__summary--item').forEach(item => {
-            const num = item.querySelector('.data__summary--num');
-            if (num) {
-                const value = clean(num.textContent);
-                // Label is usually the other span
-                const spans = item.querySelectorAll('span');
-                let label = '';
-                spans.forEach(s => {
-                    if (s !== num) label = clean(s.textContent);
-                });
+                
+                // Generic Summary Items
                 result.summary_items.push({ label, value });
             }
         });
+
+        // 2. Extract Trading Limits (often in tooltips or specific cards)
+        // If not found in figures, check specific IDs/Classes if known
+        // For now, rely on figures as they cover most summary data
         
+        // 3. Market Status Detection
+        const ledGreen = document.querySelector('.led-green');
+        const ledRed = document.querySelector('.led-red');
+        const blinker = document.querySelector('.blinker'); // continuous session often has this
+        
+        if (ledGreen) {
+            result.marketStatus = "OPEN";
+        } else if (ledRed) {
+            result.marketStatus = "CLOSED";
+        } else if (blinker) {
+             result.marketStatus = "OPEN (Blinking)";
+        }
+        
+        // 4. Fallback: Check header status icon color
+        if (result.marketStatus === "Unknown") {
+             const statusIcon = document.querySelector('.market-status-icon');
+             if (statusIcon) {
+                 const color = window.getComputedStyle(statusIcon).backgroundColor;
+                 if (color.includes('255, 0, 0') || color.includes('red')) result.marketStatus = "CLOSED";
+                 else if (color.includes('0, 128, 0') || color.includes('green')) result.marketStatus = "OPEN";
+             }
+        }
+
         return result;
     }""")
     
-    print(f"Extracted Dashboard Data: {data}")
+    # Post-process / Log
+    if data:
+        print(f"[DEBUG] Dashboard Extracted: Status={data.get('marketStatus')} | Collateral={data.get('collateral')}")
+    
     return data
