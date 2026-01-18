@@ -101,21 +101,15 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         await page.wait_for_timeout(2500)
         
         popup_msg = ""
-        # Check multiple common toast/alert selectors used in Angular apps
         popup_selectors = [
-            ".toast-message",           # ngx-toastr
-            ".alert-danger",            # Bootstrap danger
-            ".alert-success",           # Bootstrap success
-            ".alert-warning",           # Bootstrap warning
-            ".toast-success",           # Toast success
-            ".toast-error",             # Toast error
-            ".toast-info",              # Toast info
-            ".ngx-toastr",              # ngx-toastr container
-            ".swal2-popup",             # SweetAlert2
-            ".toast",                   # Generic toast
-            "[role='alert']",           # ARIA alerts
-            ".notification",            # Generic notification
-            ".message-box",             # Custom message boxes
+            ".toast-container .toast-message",  # ngx-toastr specific
+            ".toast-message",                    # ngx-toastr message
+            ".toast-body",                       # Bootstrap 5 toast
+            ".alert-danger:not(.header *)",      # Bootstrap danger (not in header)
+            ".alert-success:not(.header *)",     # Bootstrap success (not in header)
+            ".swal2-title",                      # SweetAlert2 title
+            ".swal2-content",                    # SweetAlert2 content
+            "#toast-container .toast",           # Common toast container
         ]
         
         for selector in popup_selectors:
@@ -124,7 +118,8 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             for i in range(count):
                 if await popups.nth(i).is_visible():
                     txt = await popups.nth(i).text_content()
-                    if txt and txt.strip():
+                    # Filter out header notification text
+                    if txt and txt.strip() and "notification" not in txt.lower() and "see all" not in txt.lower():
                         popup_msg += txt.strip() + " "
         
         popup_msg = popup_msg.strip()
@@ -146,110 +141,95 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             # If no popup, assume success
             result["status"] = "SUBMITTED"
             result["message"] = "Order submitted (no popup captured)"
-            
-            # --- 8. EXTRACT ON-PAGE ORDER BOOK (With Refresh & Actions) ---
-            print("[DEBUG] Refreshing On-Page Order Book...")
+        
+        # --- 8. EXTRACT ON-PAGE ORDER BOOK (ALWAYS runs) ---
+        print("[DEBUG] Refreshing On-Page Order Book...")
+        try:
+            # 1. Click Refresh Button
+            refresh_btn = page.locator(".nf-refresh, button:has(.nf-refresh), .icon-refresh").last
+            if await refresh_btn.is_visible():
+                await refresh_btn.click()
+                await page.wait_for_timeout(1500)
+            else:
+                print("[DEBUG] Refresh button not found, scraping current state.")
+
+            # Try clicking "Daily Order Book" tab if visible
             try:
-                # 1. Click Refresh Button
-                # Selector strategy: Look for 'refresh' icon (.nf-refresh) confirmed from dump
-                refresh_btn = page.locator(".nf-refresh, button:has(.nf-refresh), .icon-refresh").last
-                if await refresh_btn.is_visible():
-                    await refresh_btn.click()
-                    await page.wait_for_timeout(1500) # Wait for reload
-                else:
-                    print("[DEBUG] Refresh button not found, scraping current state.")
+                daily_tab = page.locator("a:has-text('Daily Order Book'), span:has-text('Daily Order Book')").first
+                if await daily_tab.is_visible():
+                    await daily_tab.click()
+                    await page.wait_for_timeout(1000)
+            except: pass
 
-                # 2. Scrape Table with Actions
-                # 2. Scrape Client's Order Book Table (NOT Market Depth)
-                # The "Daily Order Book" is likely a tab or separate section.
-                # Strategy: Ensure "Daily Order Book" tab is active, then find the grid inside it.
+            # Target the KENDO GRID specifically
+            kendo_grid = page.locator("kendo-grid, .k-grid").first
+            if await kendo_grid.is_visible():
+                print("[DEBUG] Found Kendo Grid (Order Book)")
+                rows = kendo_grid.locator("tbody tr, .k-grid-content tbody tr")
+            else:
+                # Fallback: try to find any table that contains the symbol
+                print("[DEBUG] Kendo Grid not found, falling back to symbol search...")
+                tables = page.locator("table")
+                count_tables = await tables.count()
+                target_table = None
                 
-                # Try clicking "Daily Order Book" tab if visible
-                try:
-                    daily_tab = page.locator("a:has-text('Daily Order Book'), span:has-text('Daily Order Book')").first
-                    if await daily_tab.is_visible():
-                         await daily_tab.click()
-                         await page.wait_for_timeout(1000)
-                except: pass
-
-                # Strategy: Target the KENDO GRID specifically (class k-grid)
-                # The Market Depth table is NOT a Kendo Grid, so this selector is more precise.
-                # Order Book uses Kendo Grid which has k-grid-content for the scrollable data area.
-                
-                kendo_grid = page.locator("kendo-grid, .k-grid").first
-                if await kendo_grid.is_visible():
-                    print("[DEBUG] Found Kendo Grid (Order Book)")
-                    rows = kendo_grid.locator("tbody tr, .k-grid-content tbody tr")
-                else:
-                    # Fallback: try to find any table that contains the symbol we just ordered
-                    print("[DEBUG] Kendo Grid not found, falling back to symbol search...")
-                    tables = page.locator("table")
-                    count_tables = await tables.count()
-                    target_table = None
-                    
-                    for t_idx in range(count_tables):
-                        tbl = tables.nth(t_idx)
-                        tbl_text = await tbl.text_content()
-                        # Check if this table contains the symbol we ordered
-                        if symbol.upper() in tbl_text.upper():
-                            target_table = tbl
-                            print(f"[DEBUG] Found table containing symbol at index {t_idx}")
-                            break
-                    
-                    if target_table:
-                        rows = target_table.locator("tbody tr")
-                    else:
-                        # Last resort fallback
-                        rows = page.locator(".table tbody tr")
-
-                count = await rows.count()
-                order_book_entries = []
-                
-                print(f"[DEBUG] Found {count} rows in Order Book.")
-                
-                for i in range(min(count, 10)): # Check top 10
-                    row = rows.nth(i)
-                    row_text = await row.inner_text()
-                    
-                    if "No records available" in row_text:
+                for t_idx in range(count_tables):
+                    tbl = tables.nth(t_idx)
+                    tbl_text = await tbl.text_content()
+                    if symbol.upper() in tbl_text.upper():
+                        target_table = tbl
+                        print(f"[DEBUG] Found table containing symbol at index {t_idx}")
                         break
-                    
-                    # Extract Data Columns (naive split or cell-by-cell)
-                    cells = row.locator("td")
-                    cell_count = await cells.count()
-                    row_data = []
-                    action_links = []
-                    
-                    for j in range(cell_count):
-                        cell = cells.nth(j)
-                        text = (await cell.inner_text()).strip()
-                        row_data.append(text)
-                        
-                        # Check for Action Links/Buttons in any cell (usually the last or first)
-                        # Look for <a> or <button>
-                        links = cell.locator("a, button")
-                        if await links.count() > 0:
-                            for k in range(await links.count()):
-                                link = links.nth(k)
-                                # Get link info (href, title, or icon class)
-                                href = await link.get_attribute("href")
-                                title = await link.get_attribute("title")
-                                if href and href != "#":
-                                    action_links.append(f"Link: {href}")
-                                elif title:
-                                    action_links.append(f"Action: {title}")
-                    
-                    entry = {
-                        "row_text": " | ".join(row_data),
-                        "actions": action_links
-                    }
-                    order_book_entries.append(entry)
                 
-                result["orderBook"] = order_book_entries
-                print(f"[DEBUG] Extracted {len(order_book_entries)} entries.")
+                if target_table:
+                    rows = target_table.locator("tbody tr")
+                else:
+                    rows = page.locator(".table tbody tr")
+
+            count = await rows.count()
+            order_book_entries = []
+            
+            print(f"[DEBUG] Found {count} rows in Order Book.")
+            
+            for i in range(min(count, 10)):
+                row = rows.nth(i)
+                row_text = await row.inner_text()
                 
-            except Exception as e:
-                print(f"[DEBUG] Order Book extraction failed: {e}")
+                if "No records available" in row_text:
+                    break
+                
+                cells = row.locator("td")
+                cell_count = await cells.count()
+                row_data = []
+                action_links = []
+                
+                for j in range(cell_count):
+                    cell = cells.nth(j)
+                    text = (await cell.inner_text()).strip()
+                    row_data.append(text)
+                    
+                    links = cell.locator("a, button")
+                    if await links.count() > 0:
+                        for k in range(await links.count()):
+                            link = links.nth(k)
+                            href = await link.get_attribute("href")
+                            title = await link.get_attribute("title")
+                            if href and href != "#":
+                                action_links.append(f"Link: {href}")
+                            elif title:
+                                action_links.append(f"Action: {title}")
+                
+                entry = {
+                    "row_text": " | ".join(row_data),
+                    "actions": action_links
+                }
+                order_book_entries.append(entry)
+            
+            result["orderBook"] = order_book_entries
+            print(f"[DEBUG] Extracted {len(order_book_entries)} entries.")
+            
+        except Exception as e:
+            print(f"[DEBUG] Order Book extraction failed: {e}")
             
     except Exception as e:
         print(f"[DEBUG] Error placing order: {e}")
