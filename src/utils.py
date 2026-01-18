@@ -90,9 +90,9 @@ async def perform_login(page, username, password, api_key, tms_url):
             
             # Try multiple navigation strategies
             nav_strategies = [
-                ('domcontentloaded', 60000), # Increased to 60s
-                ('load', 60000),             # Increased to 60s
-                ('commit', 30000),           # Fastest, just wait for response
+                ('domcontentloaded', 20000), # User prefers shorter timeout to fail fast if stuck
+                ('load', 25000),
+                ('commit', 15000),
             ]
             
             for wait_until, timeout in nav_strategies:
@@ -106,7 +106,16 @@ async def perform_login(page, username, password, api_key, tms_url):
                     continue
             
             if not navigation_success:
-                print("[LOGIN] All navigation strategies failed. Retrying...")
+                print("[LOGIN] Navigation strategies failed (stuck on loading?). Force reloading...")
+                # Simulate Ctrl+Shift+R (Hard Reload) by clearing cache
+                try:
+                    client = await page.context.new_cdp_session(page)
+                    await client.send('Network.clearBrowserCache')
+                    print("[LOGIN] Browser cache cleared (Hard Reload simulation)")
+                except Exception as cdp_err:
+                    print(f"[LOGIN] Could not clear cache: {cdp_err}")
+                
+                # Proceed to next attempt loop which does reload/re-nav
                 continue
             
             # Wait for page to stabilize
