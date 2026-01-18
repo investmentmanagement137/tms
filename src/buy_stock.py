@@ -44,12 +44,16 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         # 1. Select Instrument Type FIRST (CRITICAL for MF like NIBLSTF)
         print(f"[DEBUG] Step 1: Selecting Instrument: {instrument}")
         try:
-            inst_select = page.locator("select.form-inst, select[formcontrolname='instType']").first
+            # Wait for dropdown to be attached and visible
+            inst_selector = "select.form-inst, select[formcontrolname='instType']"
+            await page.wait_for_selector(inst_selector, state="visible", timeout=10000)
+            
+            inst_select = page.locator(inst_selector).first
             if await inst_select.is_visible():
                 await inst_select.select_option(label=instrument)
                 print(f"[DEBUG] Instrument selected: {instrument}")
             else:
-                print("[DEBUG] WARNING: Instrument dropdown not visible!")
+                print("[DEBUG] WARNING: Instrument dropdown not visible after wait!")
         except Exception as inst_err:
             print(f"[DEBUG] Instrument selection failed: {inst_err}")
         
