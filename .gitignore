@@ -60,3 +60,15 @@ structure.txt
 *_dump.html
 order_entry_structure.txt
 tools/order_entry_dump.html
+
+# Data Artifacts
+records/
+tms-sessions/
+tms-output*.json
+analysis.txt
+*.pkl
+*.json
+!package.json
+!tsconfig.json
+!input.json
+!VERSION
