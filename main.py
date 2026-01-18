@@ -159,6 +159,7 @@ async def main():
                 # Check for Batch Orders / BATCH action
                 batch_orders = actor_input.get('orders', [])
                 check_orders_flag = actor_input.get('checkOrders', True)
+                check_dashboard_flag = actor_input.get('checkDashboard', True)
                 
                 executed_any_order = False
 
@@ -225,25 +226,28 @@ async def main():
                      Actor.log.info("Skipping verification.")
                 
                 # --- POST-TRADE DASHBOARD EXTRACTION ---
-                Actor.log.info("Extracting Dashboard Data (Post-Trade)...")
-                try:
-                    dash_data = await dashboard.extract_dashboard_data(page, tms_url)
-                    
-                    if not dash_data or not dash_data.get('tradeSummary'):
-                        Actor.log.warning("Dashboard data is empty or incomplete! Saving debug info...")
-                        try:
-                            html = await page.content()
-                            await Actor.set_value('dashboard_fail_dump.html', html, content_type='text/html')
-                            screenshot = await page.screenshot(full_page=True)
-                            await Actor.set_value('dashboard_fail.png', screenshot, content_type='image/png')
-                        except Exception as dump_err:
-                            Actor.log.error(f"Failed to save debug info: {dump_err}")
-                    
-                    final_output["dashboard"] = dash_data
-                    Actor.log.info(f"Dashboard data extracted: {len(dash_data) if dash_data else 0} sections.")
-                    
-                except Exception as e:
-                     Actor.log.error(f"Dashboard extraction raised exception: {e}")
+                if check_dashboard_flag:
+                    Actor.log.info("Extracting Dashboard Data (Post-Trade)...")
+                    try:
+                        dash_data = await dashboard.extract_dashboard_data(page, tms_url)
+                        
+                        if not dash_data or not dash_data.get('tradeSummary'):
+                            Actor.log.warning("Dashboard data is empty or incomplete! Saving debug info...")
+                            try:
+                                html = await page.content()
+                                await Actor.set_value('dashboard_fail_dump.html', html, content_type='text/html')
+                                screenshot = await page.screenshot(full_page=True)
+                                await Actor.set_value('dashboard_fail.png', screenshot, content_type='image/png')
+                            except Exception as dump_err:
+                                Actor.log.error(f"Failed to save debug info: {dump_err}")
+                        
+                        final_output["dashboard"] = dash_data
+                        Actor.log.info(f"Dashboard data extracted: {len(dash_data) if dash_data else 0} sections.")
+                        
+                    except Exception as e:
+                         Actor.log.error(f"Dashboard extraction raised exception: {e}")
+                else:
+                    Actor.log.info("Skipping Dashboard extraction (checkDashboard=false).")
                 # --- END POST-TRADE ---
                 
                 # 3. Save Output
