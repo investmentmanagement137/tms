@@ -131,7 +131,15 @@ async def main():
                     storage_state = await context.storage_state()
                     await session_store.set_value('SESSION', storage_state)
                 
-                # 5. Extract Dashboard Data (Collateral, Limits)
+                # 5. Initialize Output Dict
+                final_output = {
+                    "version": VERSION,
+                    "status": "SUCCESS",
+                    "timestamp": str(datetime.datetime.now()),
+                    "batch_results": []
+                }
+
+                # 6. Extract Dashboard Data (Collateral, Limits)
                 # We are logged in now (either via session or fresh login)
                 Actor.log.info("Extracting Dashboard Data...")
                 try:
@@ -142,13 +150,6 @@ async def main():
                     Actor.log.info("Dashboard data extracted.")
                 except Exception as e:
                      Actor.log.warning(f"Dashboard extraction failed: {e}")
-                
-                final_output = {
-                    "version": VERSION,
-                    "status": "SUCCESS",
-                    "timestamp": str(datetime.datetime.now()),
-                    "batch_results": []
-                }
 
                 # Check for Batch Orders / BATCH action
                 batch_orders = actor_input.get('orders', [])

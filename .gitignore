@@ -54,3 +54,9 @@ Thumbs.db
 
 dashboard_dump.html
 structure.txt
+
+# Debug dumps
+*_dump.png
+*_dump.html
+order_entry_structure.txt
+tools/order_entry_dump.html

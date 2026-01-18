@@ -27,15 +27,14 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     }
     
     try:
-        # 1. Select Instrument (New)
+        # 1. Select Instrument (Native Select)
         try:
-             await page.select_option("select[name='instrument'], select.form-control", label=instrument)
-        except:
+             await page.select_option("select[formcontrolname='instType']", label=instrument)
+        except Exception as err:
+             print(f"[DEBUG] Instrument selection failed: {err}")
              try:
-                 await page.click("text='INST' >> .. >> .ng-select-container, .ng-select")
-                 await page.click(f"div.ng-option:has-text('{instrument}')")
-             except Exception as ex:
-                 print(f"[DEBUG] Instrument selection failed: {ex}")
+                 await page.select_option("select[formcontrolname='instType']", value=instrument)
+             except: pass
 
         # 2. Select Sell Tab
         try:
@@ -51,19 +50,19 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
 
         # 3. Enter Symbol
         print(f"[DEBUG] Entering Symbol: {symbol}")
-        symbol_input = page.locator("input[placeholder='Symbol'], input[name='symbol']").first
-        await symbol_input.click()
-        await symbol_input.fill(symbol)
-        await page.keyboard.press("Tab") # Trigger autocomplete
-        await page.wait_for_timeout(1000)
+        await page.click("input[formcontrolname='symbol']")
+        await page.fill("input[formcontrolname='symbol']", symbol)
+        await page.keyboard.press("Tab") 
+        await page.wait_for_timeout(1500)
+        await page.keyboard.press("Enter")
 
         # 4. Enter Quantity
         print(f"[DEBUG] Entering Quantity: {quantity}")
-        await page.fill("input[placeholder='Qty'], input[name='quantity']", str(quantity))
+        await page.fill("input[formcontrolname='quantity']", str(quantity))
 
         # 5. Enter Price
         print(f"[DEBUG] Entering Price: {price}")
-        await page.fill("input[placeholder='Price'], input[name='price']", str(price))
+        await page.fill("input[formcontrolname='price']", str(price))
         
         await page.wait_for_timeout(500)
         
@@ -98,10 +97,10 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             print("[DEBUG] Refreshing On-Page Order Book...")
             try:
                 # 1. Click Refresh Button
-                refresh_btn = page.locator(".fa-refresh, button:has(.fa-refresh), .icon-refresh, button[title='Refresh']").last
+                refresh_btn = page.locator(".nf-refresh, button:has(.nf-refresh)").last
                 if await refresh_btn.is_visible():
                     await refresh_btn.click()
-                    await page.wait_for_timeout(1000)
+                    await page.wait_for_timeout(1500)
                 else:
                     print("[DEBUG] Refresh button not found.")
 

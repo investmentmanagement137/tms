@@ -39,23 +39,20 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     }
     
     try:
-        # 1. Select Instrument (New)
+        # 1. Select Instrument
+        # Analyzed HTML shows it is a native <select> with formcontrolname='instType'
         print(f"[DEBUG] Selecting Instrument: {instrument}")
         try:
-             # It might be a select or a custom dropdown. 
-             # Based on screenshot, it looks like a select or div dropdown.
-             # We try generic selector first.
-             await page.select_option("select[name='instrument'], select.form-control", label=instrument)
-        except:
-             # Fallback if it's not a native select (e.g. Angular/Kendo dropdown)
-             # Clicking dropdown trigger then option
-             print("[DEBUG] Native select failed, trying custom dropdown...")
+             # 1. Select Instrument
+             # Confirmed: Native select with formcontrolname='instType'
+             print(f"[DEBUG] Selecting Instrument: {instrument}")
+             await page.select_option("select[formcontrolname='instType']", label=instrument)
+        except Exception as inst_err:
+             print(f"[DEBUG] Instrument selection failed: {inst_err}")
+             # Backup: try by value
              try:
-                 # This selector needs to be generic enough or use text
-                 await page.click("text='INST' >> .. >> .ng-select-container, .ng-select")
-                 await page.click(f"div.ng-option:has-text('{instrument}')")
-             except Exception as ex:
-                 print(f"[DEBUG] Instrument selection failed (ignoring, simplified mode): {ex}")
+                 await page.select_option("select[formcontrolname='instType']", value=instrument)
+             except: pass
 
         # 2. Select Buy Tab (if not already selected)
         # Try finding a tab with text "Buy" or class .btn-buy
@@ -74,21 +71,20 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         # 3. Enter Symbol
         print(f"[DEBUG] Entering Symbol: {symbol}")
-        # In Playwright, we can wait for selector
-        # Sometimes clearing is needed
-        symbol_input = page.locator("input[placeholder='Symbol'], input[name='symbol']").first
-        await symbol_input.click()
-        await symbol_input.fill(symbol)
-        await page.keyboard.press("Tab") # Trigger autocomplete
-        await page.wait_for_timeout(1000) # Wait for dropdown/fetch
-
+        # Confirmed Selector: input[formcontrolname='symbol']
+        await page.click("input[formcontrolname='symbol']")
+        await page.fill("input[formcontrolname='symbol']", symbol)
+        await page.keyboard.press("Tab") 
+        await page.wait_for_timeout(1500) 
+        await page.keyboard.press("Enter")
+        
         # 4. Enter Quantity
         print(f"[DEBUG] Entering Quantity: {quantity}")
-        await page.fill("input[placeholder='Qty'], input[name='quantity']", str(quantity))
+        await page.fill("input[formcontrolname='quantity']", str(quantity))
 
         # 5. Enter Price
         print(f"[DEBUG] Entering Price: {price}")
-        await page.fill("input[placeholder='Price'], input[name='price']", str(price))
+        await page.fill("input[formcontrolname='price']", str(price))
         
         await page.wait_for_timeout(500)
         
@@ -128,12 +124,11 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             print("[DEBUG] Refreshing On-Page Order Book...")
             try:
                 # 1. Click Refresh Button
-                # Accessing the refresh icon usually in the card header or near the table
-                # Selector strategy: Look for 'refresh' icon or button inside the order book container
-                refresh_btn = page.locator(".fa-refresh, button:has(.fa-refresh), .icon-refresh, button[title='Refresh']").last
+                # Selector strategy: Look for 'refresh' icon (.nf-refresh) confirmed from dump
+                refresh_btn = page.locator(".nf-refresh, button:has(.nf-refresh), .icon-refresh").last
                 if await refresh_btn.is_visible():
                     await refresh_btn.click()
-                    await page.wait_for_timeout(1000) # Wait for reload
+                    await page.wait_for_timeout(1500) # Wait for reload
                 else:
                     print("[DEBUG] Refresh button not found, scraping current state.")
 
