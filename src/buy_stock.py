@@ -111,6 +111,7 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                 priceInput.value = '{price}';
                 priceInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
                 priceInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                priceInput.dispatchEvent(new Event('keyup', {{ bubbles: true }})); # Added keyup
                 priceInput.dispatchEvent(new Event('blur', {{ bubbles: true }}));
                 console.log('Price set to: ' + '{price}');
             }}
@@ -134,7 +135,10 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             ".box-order-entry button.btn-sm:not(.btn-default)",
             ".order__form button.btn-sm:not(.btn-default)",
             "button.btn-sm:has-text('-')", # Fallback for icon button
-            "button.btn-primary.btn-lg:not([disabled])", # Old fallback
+            "button:has(i.fa-plus)",      # Icon fallback
+            "button:has(i.fa-check)",     # Icon fallback
+            "button.btn-primary",         # Broad fallback
+            "button[type='submit']",      # Broadest fallback
         ]
         
         for selector in submit_selectors:

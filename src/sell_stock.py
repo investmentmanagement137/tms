@@ -111,6 +111,7 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                 priceInput.value = '{price}';
                 priceInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
                 priceInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                priceInput.dispatchEvent(new Event('keyup', {{ bubbles: true }}));
                 priceInput.dispatchEvent(new Event('blur', {{ bubbles: true }}));
                 console.log('Price set to: ' + '{price}');
             }}
@@ -122,34 +123,40 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         print("[DEBUG] Step 6: Looking for Submit button...")
         await page.wait_for_timeout(500)  # Wait for form validation
         
-        # Check submit button state
-        btn_info = await page.evaluate("""() => {
-            const btn = document.querySelector('button.btn-sm:not(.btn-default), button.btn-primary');
-            if (btn) {
-                return {
-                    text: btn.innerText.trim(),
-                    disabled: btn.disabled,
-                    className: btn.className
-                };
-            }
-            return null;
-        }""")
+        submit_clicked = False
+        submit_selectors = [
+            ".box-order-entry button[type='submit']",
+            ".order__form button[type='submit']", 
+            ".box-order-entry button.btn-sm:not(.btn-default)",
+            ".order__form button.btn-sm:not(.btn-default)",
+            "button.btn-sm:has-text('-')", 
+            "button:has(i.fa-plus)",
+            "button:has(i.fa-check)",
+            "button.btn-primary",
+            "button[type='submit']",
+        ]
         
-        print(f"[DEBUG] Submit button state: {btn_info}")
-        
-        if btn_info and "SELL" in btn_info.get("text", "").upper() and not btn_info.get("disabled"):
-            submit_btn = page.locator("button.btn-sm:not(.btn-default), button.btn-primary:has-text('SELL')").first
-            await submit_btn.click()
-            print("[DEBUG] Submit button clicked!")
-            submit_clicked = True
-        else:
-            print("[DEBUG] Submit button not ready, trying force click...")
-            # Force click via JS
-            await page.evaluate("""() => {
-                const btn = document.querySelector('button.btn-sm:not(.btn-default)');
+        for selector in submit_selectors:
+            try:
+                btns = page.locator(selector)
+                count = await btns.count()
+                for i in range(count):
+                    btn = btns.nth(i)
+                    if await btn.is_visible() and await btn.is_enabled():
+                        await btn.click()
+                        print(f"[DEBUG] Clicked submit button with selector: {selector}")
+                        submit_clicked = True
+                        break
+                if submit_clicked: break
+            except: continue
+            
+        if not submit_clicked:
+             print("[DEBUG] Submit button not found via locators, trying targeted JS click...")
+             # Fallback JS
+             await page.evaluate("""() => {
+                const btn = document.querySelector('button.btn-sm:not(.btn-default), button[type="submit"]');
                 if (btn) btn.click();
-            }""")
-            submit_clicked = True
+             }""")
         
         # === STEP 7: Capture Result ===
         await page.wait_for_timeout(2500)
