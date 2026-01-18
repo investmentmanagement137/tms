@@ -65,10 +65,19 @@ async def main():
                 ]
             )
             
-            # Create Context with User Agent
+            # Create Context with User Agent (and optional storage state)
+            
+            # 1. Try to load session from Apify KV Store
+            session_state = await Actor.get_value('SESSION')
+            if session_state:
+                Actor.log.info("Found saved session. Loading...")
+            else:
+                Actor.log.info("No saved session found.")
+                
             context = await browser.new_context(
                 viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                storage_state=session_state if session_state else None
             )
             
             # Stealth Script: Hide webdriver property
@@ -77,16 +86,36 @@ async def main():
             page = await context.new_page()
             
             try:
-                # 1. Perform Login
-                Actor.log.info('Executing Login Script...')
-                # We need to await logic in Playwright
-                success = await login.login(page, tms_username, tms_password, gemini_api_key, tms_url)
+                # 2. Check if Session is Valid (Skip Login?)
+                is_logged_in = False
+                if session_state:
+                     Actor.log.info("Verifying saved session...")
+                     try:
+                        # Go to a secured page (Dashboard)
+                        await page.goto(f"{tms_url}/tms/m/dashboard", wait_until='networkidle', timeout=15000)
+                        if "login" not in page.url and ("dashboard" in page.url or "tms" in page.url):
+                            Actor.log.info("Session is VALID! Skipping login.")
+                            is_logged_in = True
+                        else:
+                            Actor.log.warning("Saved session expired or invalid.")
+                     except:
+                        Actor.log.warning("Session verification failed (timeout).")
                 
-                if not success:
-                    await Actor.fail(status_message='Login failed')
-                    return
-                
-                Actor.log.info('Login successful!')
+                # 3. Perform Login (if not logged in)
+                if not is_logged_in:
+                    Actor.log.info('Executing Login Script...')
+                    success = await login.login(page, tms_username, tms_password, gemini_api_key, tms_url)
+                    
+                    if not success:
+                        await Actor.fail(status_message='Login failed')
+                        return
+                    
+                    Actor.log.info('Login successful!')
+                    
+                    # 4. Save New Session
+                    Actor.log.info("Saving session state...")
+                    storage_state = await context.storage_state()
+                    await Actor.set_value('SESSION', storage_state)
                 
                 final_output = {
                     "version": VERSION,
