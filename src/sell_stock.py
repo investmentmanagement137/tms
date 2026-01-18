@@ -27,74 +27,72 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     }
     
     try:
-        # 1. Select Instrument (Native Select)
-        try:
-             await page.select_option("select[formcontrolname='instType']", label=instrument)
-        except Exception as err:
-             print(f"[DEBUG] Instrument selection failed: {err}")
-             try:
-                 await page.select_option("select[formcontrolname='instType']", value=instrument)
-             except: pass
-
-        # 2. Select Sell Tab
-        try:
-            sell_tab = page.locator("xpath=//a[contains(text(), 'Sell')] | //button[contains(text(), 'Sell')]").first
-            if await sell_tab.is_visible():
-                await sell_tab.click()
-            else:
-                 await page.click(".btn-sell, .sell-tab, input[value='2']")
-        except:
-             print("[DEBUG] Sell tab selection exception (ignoring)")
-
-        print("[DEBUG] Selected SELL tab")
-
-        # 3. Enter Symbol
-        print(f"[DEBUG] Entering Symbol: {symbol}")
-        await page.click("input[formcontrolname='symbol']")
-        await page.fill("input[formcontrolname='symbol']", symbol)
-        await page.keyboard.press("Tab") 
-        await page.wait_for_timeout(1500)
-        await page.keyboard.press("Enter")
-
-        # 4. Enter Quantity
-        print(f"[DEBUG] Entering Quantity: {quantity}")
-        await page.fill("input[formcontrolname='quantity']", str(quantity))
-
-        # 5. Enter Price
-        print(f"[DEBUG] Entering Price: {price}")
-        await page.fill("input[formcontrolname='price']", str(price))
-        
-        await page.wait_for_timeout(500)
-        
-        # 6. Click SELL toggle (required - neutral state won't submit)
-        print("[DEBUG] Step 6: Looking for SELL toggle...")
-        # CORRECT SELECTOR from browser exploration: .order__options--sell
-        toggle_selectors = [
-            ".order__options--sell",     # Primary selector found from browser exploration
-            "text=SELL",                 # Fallback text selector
-            "span:text('SELL')",
-            "[class*='options--sell']",  # Partial class match
-        ]
-        
-        toggle_clicked = False
-        for sel in toggle_selectors:
-            try:
-                toggle = page.locator(sel).first
-                if await toggle.is_visible():
-                    await toggle.click()
-                    toggle_clicked = True
-                    print(f"[DEBUG] SELL toggle clicked using selector: {sel}")
-                    break
-            except:
-                pass
-        
-        if not toggle_clicked:
-            print("[DEBUG] WARNING: Could not find SELL toggle!")
+        # === VERIFIED SELECTORS FROM BROWSER EXPLORATION ===
+        # 1. Click SELL toggle FIRST (required - form won't work in neutral state)
+        print("[DEBUG] Step 1: Clicking SELL toggle...")
+        sell_toggle = page.locator(".order__options--sell")
+        if await sell_toggle.is_visible():
+            await sell_toggle.click()
+            print("[DEBUG] SELL toggle clicked via .order__options--sell")
+        else:
+            await page.locator("text=SELL").first.click()
+            print("[DEBUG] SELL toggle clicked via text=SELL")
         
         await page.wait_for_timeout(300)
         
-        # 7. Click Submit (Sell Button)
-        print("[DEBUG] Step 7: Looking for Submit button...")
+        # 2. Select Instrument Type
+        print(f"[DEBUG] Step 2: Selecting Instrument: {instrument}")
+        try:
+            inst_select = page.locator("select.form-inst")
+            if await inst_select.is_visible():
+                await inst_select.select_option(label=instrument)
+                print(f"[DEBUG] Instrument selected: {instrument}")
+            else:
+                await page.select_option("select[formcontrolname='instType']", label=instrument)
+        except Exception as inst_err:
+            print(f"[DEBUG] Instrument selection failed: {inst_err}")
+        
+        await page.wait_for_timeout(300)
+        
+        # 3. Enter Symbol
+        print(f"[DEBUG] Step 3: Entering Symbol: {symbol}")
+        symbol_input = page.locator("input.form-control.form-control-sm").first
+        if await symbol_input.is_visible():
+            await symbol_input.click()
+            await symbol_input.fill(symbol)
+            print(f"[DEBUG] Symbol filled: {symbol}")
+        else:
+            await page.fill("input[formcontrolname='symbol']", symbol)
+        
+        await page.keyboard.press("Tab")
+        await page.wait_for_timeout(1500)
+        await page.keyboard.press("Enter")
+        print("[DEBUG] Symbol entry complete")
+        
+        await page.wait_for_timeout(500)
+
+        # 4. Enter Quantity
+        print(f"[DEBUG] Step 4: Entering Quantity: {quantity}")
+        qty_input = page.locator("input.form-qty")
+        if await qty_input.is_visible():
+            await qty_input.fill(str(quantity))
+            print(f"[DEBUG] Quantity filled: {quantity}")
+        else:
+            await page.fill("input[formcontrolname='quantity']", str(quantity))
+
+        # 5. Enter Price
+        print(f"[DEBUG] Step 5: Entering Price: {price}")
+        price_input = page.locator("input.form-price")
+        if await price_input.is_visible():
+            await price_input.fill(str(price))
+            print(f"[DEBUG] Price filled: {price}")
+        else:
+            await page.fill("input[formcontrolname='price']", str(price))
+        
+        await page.wait_for_timeout(500)
+        
+        # 6. Click Submit Button
+        print("[DEBUG] Step 6: Looking for Submit button...")
         submit_selectors = [
             "button.btn-sm:not(.btn-default)",   # Primary: small button that's not cancel
             "button:has-text('SELL')",           # Button with SELL text
