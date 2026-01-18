@@ -45,8 +45,9 @@ After fixing the session verification, a secondary issue was found where the bot
 - **Cause:** The main execution logic (Login + Extraction) was accidentally indented *inside* the `except` block of the session verification. This meant it only ran if the session check crashed, not if it gracefully reported "Session expired".
 - **Fix:** Restructured `main.py` to ensure the Login/Extraction block runs sequentially after the session check, wrapped in its own `try/except` for safety.
 
-### Order Book Extraction Analysis (Pending)
-Instrumented `src/buy_stock.py` to capture `order_entry_dump.html` and `order_entry_fail.png` when the order book count is 0. This will help identify the correct selectors for the "Top 5 Buy/Sell" table on the Order Entry page.
+### Order Book Extraction Analysis (Implemented)
+Analyzed `order_entry_dump.html` and found two tables: one for headers (in `.k-grid-header`) and one for data (in `.k-grid-content`).
+- **Fix:** Update `src/buy_stock.py` to use specific selector `.k-grid-content tbody tr` to target only the data rows, avoiding the header table. Added explicit wait for this selector.
 
 ## Verification
 Created a script `verify_dashboard_extraction_local.py` that:

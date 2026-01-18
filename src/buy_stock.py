@@ -199,7 +199,15 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                 await page.wait_for_timeout(2000)
             
             # Get order book rows
-            rows = page.locator("kendo-grid tbody tr, .k-grid tbody tr")
+            # Get order book rows - target specifically the data content table
+            # The structure separates headers (.k-grid-header) and data (.k-grid-content)
+            data_rows_selector = ".k-grid-content tbody tr"
+            try:
+                await page.wait_for_selector(data_rows_selector, timeout=5000)
+            except:
+                print("[DEBUG] Timeout waiting for order book rows")
+
+            rows = page.locator(data_rows_selector)
             count = await rows.count()
             
             order_book = []
