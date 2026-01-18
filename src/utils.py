@@ -90,9 +90,9 @@ async def perform_login(page, username, password, api_key, tms_url):
             
             # Try multiple navigation strategies
             nav_strategies = [
-                ('domcontentloaded', 20000),
-                ('load', 25000),
-                ('commit', 15000),  # Fastest, just wait for response
+                ('domcontentloaded', 60000), # Increased to 60s
+                ('load', 60000),             # Increased to 60s
+                ('commit', 30000),           # Fastest, just wait for response
             ]
             
             for wait_until, timeout in nav_strategies:
