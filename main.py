@@ -121,10 +121,12 @@ async def main():
             
             data = client.extract_tradebook(months=months)
             
-            if not data or len(data) == 0:
-                await Actor.fail(status_message='No trade book data extracted')
-                return
+            if not data or len(data) <= 1: # Empty or just headers
+                Actor.log.warning('No trade book data found for the specified period.')
+                await Actor.push_data([]) # Push empty to finish cleanly
+                return # Exit successfully
             
+            Actor.log.info(f'Extracted {len(data)-1} trade records')
             # Parse data into list of dicts
             json_data = []
             if len(data) > 1:
