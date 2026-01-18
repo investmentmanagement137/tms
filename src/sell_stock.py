@@ -104,7 +104,6 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                 else:
                     print("[DEBUG] Refresh button not found.")
 
-                # 2. Scrape Table with Actions
                 # 2. Scrape Client's Order Book
                 try:
                     daily_tab = page.locator("a:has-text('Daily Order Book'), span:has-text('Daily Order Book')").first
@@ -113,21 +112,30 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                          await page.wait_for_timeout(1000)
                 except: pass
 
-                target_table = None
-                tables = page.locator("table")
-                count_tables = await tables.count()
-                
-                for t_idx in range(count_tables):
-                    tbl = tables.nth(t_idx)
-                    header_text = await tbl.text_content() 
-                    if "Order No" in header_text or "Status" in header_text or "Action" in header_text:
-                        target_table = tbl
-                        break
-                
-                if target_table:
-                    rows = target_table.locator("tbody tr")
+                # Strategy: Target the KENDO GRID specifically (class k-grid)
+                kendo_grid = page.locator("kendo-grid, .k-grid").first
+                if await kendo_grid.is_visible():
+                    print("[DEBUG] Found Kendo Grid (Order Book)")
+                    rows = kendo_grid.locator("tbody tr, .k-grid-content tbody tr")
                 else:
-                     rows = page.locator(".table tbody tr")
+                    # Fallback: try to find any table that contains the symbol we just ordered
+                    print("[DEBUG] Kendo Grid not found, falling back to symbol search...")
+                    tables = page.locator("table")
+                    count_tables = await tables.count()
+                    target_table = None
+                    
+                    for t_idx in range(count_tables):
+                        tbl = tables.nth(t_idx)
+                        tbl_text = await tbl.text_content()
+                        if symbol.upper() in tbl_text.upper():
+                            target_table = tbl
+                            print(f"[DEBUG] Found table containing symbol at index {t_idx}")
+                            break
+                    
+                    if target_table:
+                        rows = target_table.locator("tbody tr")
+                    else:
+                        rows = page.locator(".table tbody tr")
 
                 count = await rows.count()
                 order_book_entries = []

@@ -145,31 +145,35 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
                          await page.wait_for_timeout(1000)
                 except: pass
 
-                # Now target the table. Assuming Kendo Grid or similar.
-                # Use a more specific selector than just ".table" which hits Market Depth first.
-                # Logic: Look for the table that has headers like 'Symbol', 'Order No' or simply the second table.
-                # Or look for the container with class 'daily-order-book' (if it existed)
-                # Best guess from dump: The second or third table, or the one inside the tab content.
+                # Strategy: Target the KENDO GRID specifically (class k-grid)
+                # The Market Depth table is NOT a Kendo Grid, so this selector is more precise.
+                # Order Book uses Kendo Grid which has k-grid-content for the scrollable data area.
                 
-                # Let's try finding the table that contains "Order No" or "Status" in header
-                target_table = None
-                tables = page.locator("table")
-                count_tables = await tables.count()
-                
-                print(f"[DEBUG] Found {count_tables} tables. Searching for Client Order Book...")
-                for t_idx in range(count_tables):
-                    tbl = tables.nth(t_idx)
-                    header_text = await tbl.text_content() 
-                    if "Order No" in header_text or "Status" in header_text or "Action" in header_text:
-                        target_table = tbl
-                        print(f"[DEBUG] Found likely Order Book table at index {t_idx}")
-                        break
-                
-                if target_table:
-                    rows = target_table.locator("tbody tr")
+                kendo_grid = page.locator("kendo-grid, .k-grid").first
+                if await kendo_grid.is_visible():
+                    print("[DEBUG] Found Kendo Grid (Order Book)")
+                    rows = kendo_grid.locator("tbody tr, .k-grid-content tbody tr")
                 else:
-                    # Fallback to previous logic (risky)
-                     rows = page.locator(".table tbody tr")
+                    # Fallback: try to find any table that contains the symbol we just ordered
+                    print("[DEBUG] Kendo Grid not found, falling back to symbol search...")
+                    tables = page.locator("table")
+                    count_tables = await tables.count()
+                    target_table = None
+                    
+                    for t_idx in range(count_tables):
+                        tbl = tables.nth(t_idx)
+                        tbl_text = await tbl.text_content()
+                        # Check if this table contains the symbol we ordered
+                        if symbol.upper() in tbl_text.upper():
+                            target_table = tbl
+                            print(f"[DEBUG] Found table containing symbol at index {t_idx}")
+                            break
+                    
+                    if target_table:
+                        rows = target_table.locator("tbody tr")
+                    else:
+                        # Last resort fallback
+                        rows = page.locator(".table tbody tr")
 
                 count = await rows.count()
                 order_book_entries = []
