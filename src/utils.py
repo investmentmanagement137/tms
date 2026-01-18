@@ -90,9 +90,9 @@ async def perform_login(page, username, password, api_key, tms_url):
             
             # Try multiple navigation strategies
             nav_strategies = [
-                ('domcontentloaded', 20000), # User prefers shorter timeout to fail fast if stuck
-                ('load', 25000),
-                ('commit', 15000),
+                ('domcontentloaded', 30000), 
+                ('load', 60000),
+                ('commit', 30000),
             ]
             
             for wait_until, timeout in nav_strategies:
@@ -150,12 +150,20 @@ async def perform_login(page, username, password, api_key, tms_url):
                 '#username',
             ]
             
+            # Wait for ANY username field to appear
+            try:
+                combined_selector = ", ".join(username_selectors)
+                print(f"[LOGIN] Waiting for username field to appear (Timeout: 30s)...")
+                await page.wait_for_selector(combined_selector, state='visible', timeout=30000)
+            except Exception as e:
+                print(f"[LOGIN] ❌ Username field did not appear in time: {e}")
+                continue
+
             username_filled = False
             for selector in username_selectors:
                 try:
                     username_loc = page.locator(selector).first
                     if await username_loc.count() > 0:
-                        await username_loc.wait_for(state='visible', timeout=5000)
                         await username_loc.fill(username)
                         print(f"[LOGIN] Username filled using: {selector}")
                         username_filled = True
@@ -164,7 +172,7 @@ async def perform_login(page, username, password, api_key, tms_url):
                     continue
             
             if not username_filled:
-                print("[LOGIN] ❌ Could not find username field")
+                print("[LOGIN] ❌ Failed to fill username (even after wait)")
                 continue
             
             # === STEP 4: Fill Password ===
