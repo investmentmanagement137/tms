@@ -42,3 +42,13 @@
 - [x] Configure Git user details
 - [x] Resolve merge conflicts
 - [x] Push to GitHub repository
+
+## New Features (User Requested)
+- [x] **Rewrite Buy/Sell Workflow**
+  - [x] Use URL parameters for Symbol (`?symbol=...`)
+  - [x] Implement robust JS injection for form filling (Instrument, Toggle, Qty, Price)
+  - [x] Verify submit logic
+- [x] **Extract Dashboard Data**
+  - [x] Implement structured extraction for Fund, Trade, and Collateral summaries
+  - [x] Add Market Status detection
+
