@@ -23,9 +23,12 @@ Automated trading actor for NEPSE TMS (Trade Management System). Supports **Buyi
 | `tmsUsername` | String | TMS Login Username | ✅ | - |
 | `tmsPassword` | String | TMS Login Password | ✅ | - |
 | `geminiApiKey` | String | Google Gemini API Key (for CAPTCHA) | ✅ | - |
-| `action` | String | `BUY`, `SELL`, or `CHECK_ORDERS`. (Ignored if `orders` array is present) | ✅ | `CHECK_ORDERS` |
-| `orders` | Array | **Batch Mode**: List of orders to execute. See structure below. | ❌ | `[]` |
-| `checkOrders` | Boolean | Scrape Order Book after trading? (Runs ONLY ONCE at end) | ❌ | `true` |
+| `action` | String | `BUY`, `SELL`, or `BATCH`. | ✅ | `BATCH` |
+| `symbol` | String | Stock Symbol (Single Mode) | ⚠️ | - |
+| `price` | Number | Price per unit (Single Mode) | ⚠️ | - |
+| `quantity` | Integer | Number of units (Single Mode) | ⚠️ | - |
+| `orders` | Array | **Batch Mode**: List of orders to execute. | ❌ | `[]` |
+| `checkOrders` | Boolean | Scrape Order Book after trading? | ❌ | `true` |
 | `uploadToS3` | Boolean | Upload result to Supabase? | ❌ | `true` |
 
 ### Batch `orders` Structure
@@ -48,11 +51,12 @@ Use this for **Multiple Buys** or **Rebalancing**.
 ]
 ```
 
-### Single Mode Inputs (Legacy/Simple)
-If `orders` is empty, the actor uses these top-level fields:
+### Single Mode Inputs
+If `orders` is empty, the actor uses:
 - `symbol`
-- `buyPrice` / `buyQuantity` (for BUY action)
-- `sellPrice` / `sellQuantity` (for SELL action)
+- `price`
+- `quantity`
+- `action` (BUY/SELL)
 
 ---
 

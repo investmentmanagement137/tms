@@ -155,27 +155,27 @@ async def main():
 
             else:
                 # Fallback to Single Action Logic (Legacy/Single Mode)
+                symbol = actor_input.get('symbol')
+                price = actor_input.get('price')
+                quantity = actor_input.get('quantity')
+                
                 if action == 'BUY':
-                    symbol = actor_input.get('symbol')
-                    buy_price = actor_input.get('buyPrice')
-                    buy_quantity = actor_input.get('buyQuantity')
-                    
-                    if all([symbol, buy_price, buy_quantity]):
+                    if all([symbol, price, quantity]):
                         Actor.log.info('Executing Single BUY...')
-                        order_result = buy_stock.execute(driver, tms_url, str(symbol).strip().upper(), int(buy_quantity), float(buy_price))
+                        order_result = buy_stock.execute(driver, tms_url, str(symbol).strip().upper(), int(quantity), float(price))
                         final_output["batch_results"].append(order_result)
                         executed_any_order = True
+                    else:
+                        Actor.log.warning("Skipping BUY: Missing symbol, price, or quantity.")
                 
                 elif action == 'SELL':
-                    symbol = actor_input.get('symbol')
-                    sell_price = actor_input.get('sellPrice')
-                    sell_quantity = actor_input.get('sellQuantity')
-                     
-                    if all([symbol, sell_price, sell_quantity]):
+                    if all([symbol, price, quantity]):
                         Actor.log.info('Executing Single SELL...')
-                        order_result = sell_stock.execute(driver, tms_url, str(symbol).strip().upper(), int(sell_quantity), float(sell_price))
+                        order_result = sell_stock.execute(driver, tms_url, str(symbol).strip().upper(), int(quantity), float(price))
                         final_output["batch_results"].append(order_result)
                         executed_any_order = True
+                    else:
+                        Actor.log.warning("Skipping SELL: Missing symbol, price, or quantity.")
 
             # Global Verification (Once at the end)
             if (executed_any_order and check_orders_flag) or action == 'CHECK_ORDERS':

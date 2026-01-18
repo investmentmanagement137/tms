@@ -50,26 +50,14 @@
             "editor": "textfield",
             "sectionCaption": "Single Order Details"
         },
-        "buyPrice": {
-            "title": "Buy Price",
+        "price": {
+            "title": "Price",
             "type": "integer",
             "description": "Price per unit",
             "editor": "number"
         },
-        "buyQuantity": {
-            "title": "Buy Quantity",
-            "type": "integer",
-            "description": "Number of units",
-            "editor": "number"
-        },
-        "sellPrice": {
-            "title": "Sell Price",
-            "type": "integer",
-            "description": "Price per unit",
-            "editor": "number"
-        },
-        "sellQuantity": {
-            "title": "Sell Quantity",
+        "quantity": {
+            "title": "Quantity",
             "type": "integer",
             "description": "Number of units",
             "editor": "number"
