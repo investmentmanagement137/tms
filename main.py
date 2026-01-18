@@ -12,9 +12,7 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 # Import modular scripts
-from src import login
-from src import buy_stock
-from src import daily_history
+from src import utils, login, buy_stock, sell_stock, daily_history
 
 
 def upload_to_supabase(file_path, endpoint, region, access_key, secret_key, bucket_name):
@@ -138,6 +136,38 @@ async def main():
                 final_output.update(order_result)
                 
                 # Check Orders after buying (Optional)
+                check_orders = actor_input.get('checkOrders', True)
+                if check_orders:
+                    Actor.log.info('Executing Daily History Script (Verification)...')
+                    orders = daily_history.extract(driver, tms_url)
+                    final_output["todaysOrderPage"] = orders
+                else:
+                    Actor.log.info('Skipping order verification (checkOrders=False)')
+
+            elif action == 'SELL':
+                symbol = actor_input.get('symbol')
+                sell_price = actor_input.get('sellPrice')
+                sell_quantity = actor_input.get('sellQuantity')
+                
+                if not all([symbol, sell_price, sell_quantity]):
+                    await Actor.fail('For SELL action, you must provide: symbol, sellPrice, sellQuantity')
+                    return
+                
+                # Clean inputs
+                symbol = str(symbol).strip().upper()
+                try:
+                    sell_price = float(sell_price)
+                    sell_quantity = int(sell_quantity)
+                except ValueError:
+                    await Actor.fail('sellPrice must be a number and sellQuantity must be an integer.')
+                    return
+
+                Actor.log.info('Executing Sell Stock Script...')
+                order_result = sell_stock.execute(driver, tms_url, symbol, sell_quantity, sell_price)
+                
+                final_output.update(order_result)
+                
+                # Check Orders after selling (Optional)
                 check_orders = actor_input.get('checkOrders', True)
                 if check_orders:
                     Actor.log.info('Executing Daily History Script (Verification)...')

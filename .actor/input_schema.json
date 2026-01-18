@@ -39,6 +39,7 @@
             "default": "CHECK_ORDERS",
             "enum": [
                 "BUY",
+                "SELL",
                 "CHECK_ORDERS"
             ]
         },
@@ -59,6 +60,24 @@
             "type": "integer",
             "description": "Number of units to buy",
             "editor": "number"
+        },
+        "sellPrice": {
+            "title": "Sell Price",
+            "type": "integer",
+            "description": "Price per unit to sell at",
+            "editor": "number"
+        },
+        "sellQuantity": {
+            "title": "Sell Quantity",
+            "type": "integer",
+            "description": "Number of units to sell",
+            "editor": "number"
+        },
+        "checkOrders": {
+            "title": "Check Orders After Buy?",
+            "type": "boolean",
+            "description": "If true, scrapes Today's Order Book after placing the order to verify.",
+            "default": true
         },
         "uploadToS3": {
             "title": "Upload to Supabase S3?",

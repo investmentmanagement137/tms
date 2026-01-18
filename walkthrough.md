@@ -281,7 +281,22 @@ curl --request POST \
 > **New Feature**: Set `"checkOrders": false` to skip the post-buy order book verification. Default is `true`.
 
 
-### 2. Check Daily Orders (Example)
+### 2. Sell Request (Example)
+```bash
+curl --request POST \
+  --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "tmsUrl": "https://tms58.nepsetms.com.np",
+    "action": "SELL",
+    "symbol": "NICA",
+    "sellQuantity": 10,
+    "sellPrice": 450,
+    "checkOrders": true
+}'
+```
+
+### 3. Check Daily Orders (Example)
 ```bash
 curl --request POST \
   --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
