@@ -123,6 +123,7 @@ async def main():
                 is_logged_in = False
                 
                 # 3. Perform Login (if not logged in)
+            try:
                 if not is_logged_in:
                     # Clear cookies if session failed validation to avoid weird states
                     if session_state:
