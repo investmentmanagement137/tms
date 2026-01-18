@@ -48,6 +48,16 @@ async def main():
             
         Actor.log.info(f"TMS Actor Version: {VERSION}")
         
+        # --- Geo-Location Logging ---
+        try:
+            import requests
+            ip_info = requests.get('http://ip-api.com/json/', timeout=5).json()
+            country = ip_info.get('country', 'Unknown')
+            monitor_ip = ip_info.get('query', 'Unknown')
+            Actor.log.info(f"📍 Actor Running From: {country} (IP: {monitor_ip})")
+        except Exception as e:
+            Actor.log.warning(f"Could not determine location: {e}")
+        
         # Launch Playwright Browser
         Actor.log.info('Launching Playwright browser...')
         
