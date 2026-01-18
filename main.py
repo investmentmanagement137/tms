@@ -107,14 +107,17 @@ async def main():
                      try:
                         # Go to a secured page (Dashboard)
                         # We use Client dashboard for verification now as that's our target
+                        # We use Client dashboard for verification now as that's our target
                         verify_url = f"{tms_url}/tms/client/dashboard"
-                        await page.goto(verify_url, wait_until='networkidle', timeout=20000)
+                        # Use domcontentloaded to be faster/less brittle than networkidle
+                        await page.goto(verify_url, wait_until='domcontentloaded', timeout=30000)
                         
                         # CRITICAL: Check for specific dashboard elements, not just URL
                         # SPA might show login form while URL remains /dashboard
                         try:
                             # Look for sidebar icon, top bar, or dashboard box
-                            await page.wait_for_selector(".nf-dashboard, .box, app-dashboard, .user-profile", state='attached', timeout=8000)
+                            # Increased timeout to 15s to allow for slow rendering
+                            await page.wait_for_selector(".nf-dashboard, .box, app-dashboard, .user-profile", state='attached', timeout=15000)
                             
                             if "login" not in page.url:
                                 Actor.log.info("Session is VALID! Found dashboard elements.")
