@@ -72,26 +72,42 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         await submit_btn.click()
         print("[DEBUG] Clicked Submit.")
         
-        # 7. Check for Errors/Success
-        await page.wait_for_timeout(2000)
+        # 7. Check for Errors/Success (Toast Messages & Popups)
+        await page.wait_for_timeout(2500)
         
-        error_msg = ""
-        toasts = page.locator(".toast-message, .alert-danger")
-        count = await toasts.count()
-        if count > 0:
+        popup_msg = ""
+        popup_selectors = [
+            ".toast-message", ".alert-danger", ".alert-success", ".alert-warning",
+            ".toast-success", ".toast-error", ".toast-info", ".ngx-toastr",
+            ".swal2-popup", ".toast", "[role='alert']", ".notification", ".message-box",
+        ]
+        
+        for selector in popup_selectors:
+            popups = page.locator(selector)
+            count = await popups.count()
             for i in range(count):
-                if await toasts.nth(i).is_visible():
-                    txt = await toasts.nth(i).text_content()
-                    error_msg += txt + " "
-            
-        if error_msg and "success" not in error_msg.lower():
-            print(f"[DEBUG] Order Error: {error_msg}")
-            result["message"] = f"Error: {error_msg}"
-            result["status"] = "ERROR"
+                if await popups.nth(i).is_visible():
+                    txt = await popups.nth(i).text_content()
+                    if txt and txt.strip():
+                        popup_msg += txt.strip() + " "
+        
+        popup_msg = popup_msg.strip()
+        print(f"[DEBUG] Captured popup message: {popup_msg}")
+        
+        if popup_msg:
+            result["popupMessage"] = popup_msg
+            if any(err in popup_msg.lower() for err in ["error", "failed", "invalid", "rejected", "insufficient"]):
+                result["message"] = popup_msg
+                result["status"] = "ERROR"
+            elif any(suc in popup_msg.lower() for suc in ["success", "placed", "submitted", "accepted"]):
+                result["message"] = popup_msg
+                result["status"] = "SUBMITTED"
+            else:
+                result["message"] = popup_msg
+                result["status"] = "SUBMITTED"
         else:
-            print("[DEBUG] Order Submitted.")
             result["status"] = "SUBMITTED"
-            result["message"] = "Order submitted successfully"
+            result["message"] = "Order submitted (no popup captured)"
             
             # --- 8. EXTRACT ON-PAGE ORDER BOOK (With Refresh & Actions) ---
             print("[DEBUG] Refreshing On-Page Order Book...")

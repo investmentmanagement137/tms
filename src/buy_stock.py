@@ -96,29 +96,56 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         await submit_btn.click()
         print("[DEBUG] Clicked Submit.")
         
-        # 7. Check for Errors/Success (Toast Messages)
-        # Wait a bit for toast
-        await page.wait_for_timeout(2000)
+        # 7. Check for Errors/Success (Toast Messages & Popups)
+        # Wait a bit for toast/popup
+        await page.wait_for_timeout(2500)
         
-        error_msg = ""
-        # Check toast or alert box
-        toasts = page.locator(".toast-message, .alert-danger")
-        count = await toasts.count()
-        if count > 0:
+        popup_msg = ""
+        # Check multiple common toast/alert selectors used in Angular apps
+        popup_selectors = [
+            ".toast-message",           # ngx-toastr
+            ".alert-danger",            # Bootstrap danger
+            ".alert-success",           # Bootstrap success
+            ".alert-warning",           # Bootstrap warning
+            ".toast-success",           # Toast success
+            ".toast-error",             # Toast error
+            ".toast-info",              # Toast info
+            ".ngx-toastr",              # ngx-toastr container
+            ".swal2-popup",             # SweetAlert2
+            ".toast",                   # Generic toast
+            "[role='alert']",           # ARIA alerts
+            ".notification",            # Generic notification
+            ".message-box",             # Custom message boxes
+        ]
+        
+        for selector in popup_selectors:
+            popups = page.locator(selector)
+            count = await popups.count()
             for i in range(count):
-                if await toasts.nth(i).is_visible():
-                    txt = await toasts.nth(i).text_content()
-                    error_msg += txt + " "
+                if await popups.nth(i).is_visible():
+                    txt = await popups.nth(i).text_content()
+                    if txt and txt.strip():
+                        popup_msg += txt.strip() + " "
         
-        if error_msg and "success" not in error_msg.lower():
-            print(f"[DEBUG] Order Error: {error_msg}")
-            result["message"] = f"Error: {error_msg}"
-            result["status"] = "ERROR"
+        popup_msg = popup_msg.strip()
+        print(f"[DEBUG] Captured popup message: {popup_msg}")
+        
+        # Determine status based on message content
+        if popup_msg:
+            result["popupMessage"] = popup_msg
+            if any(err_word in popup_msg.lower() for err_word in ["error", "failed", "invalid", "rejected", "insufficient"]):
+                result["message"] = popup_msg
+                result["status"] = "ERROR"
+            elif any(suc_word in popup_msg.lower() for suc_word in ["success", "placed", "submitted", "accepted"]):
+                result["message"] = popup_msg
+                result["status"] = "SUBMITTED"
+            else:
+                result["message"] = popup_msg
+                result["status"] = "SUBMITTED"  # Default to submitted if no clear error
         else:
-            # If no error, assume success 
-            print("[DEBUG] Order Submitted.")
+            # If no popup, assume success
             result["status"] = "SUBMITTED"
-            result["message"] = "Order submitted successfully"
+            result["message"] = "Order submitted (no popup captured)"
             
             # --- 8. EXTRACT ON-PAGE ORDER BOOK (With Refresh & Actions) ---
             print("[DEBUG] Refreshing On-Page Order Book...")
