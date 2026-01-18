@@ -146,7 +146,10 @@ async def main():
 
                 if (action == 'BATCH' or (batch_orders and len(batch_orders) > 0)):
                     if not batch_orders:
-                        await Actor.fail(status_message='Action is BATCH but "orders" list is empty!')
+                    if not batch_orders:
+                        Actor.log.warning('Action is BATCH but "orders" list is empty! Nothing to do.')
+                        Actor.log.info('✅ Workflow Completed (No Orders Executed)')
+                        await Actor.exit()
                         return
 
                     Actor.log.info(f"Processing Batch of {len(batch_orders)} orders...")
