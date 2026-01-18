@@ -126,8 +126,14 @@ async def perform_login(page, username, password, api_key, tms_url):
             print(f"[LOGIN] Current URL: {current_url}")
             
             if "dashboard" in current_url or "tms/me" in current_url or "tms/client" in current_url:
-                print("[LOGIN] ✅ Already logged in (redirected to dashboard)")
-                return True
+                # CRITICAL: Verify it's actually the dashboard and not a redirect-in-progress or login masking
+                try:
+                    await page.wait_for_selector("app-client-dashboard, .user-profile, .row .card", timeout=5000)
+                    print("[LOGIN] ✅ Already logged in (Dashboard elements detected)")
+                    return True
+                except:
+                    print(f"[LOGIN] ⚠️ URL says dashboard but no elements found. Assuming false positive (Login needed).")
+                    # Fall through to login inputs
             
             # === STEP 3: Fill Username ===
             print("[LOGIN] Step 3: Filling username...")
@@ -235,19 +241,24 @@ async def perform_login(page, username, password, api_key, tms_url):
                 print("[LOGIN] ❌ Could not click login button")
                 continue
             
-            # === STEP 7: Wait for Login Result ===
+            # === STEP 7: Verify Login Success ===
             print("[LOGIN] Step 7: Waiting for login result...")
             
-            # Wait for navigation or error
             try:
-                # Wait for URL change (success) or toast (error)
-                await page.wait_for_timeout(3000)
+                # Wait for a dashboard element OR the login page again (failure)
+                # Success elements: .user-avatar, .dashboard-container, app-client-dashboard
+                await page.wait_for_selector("app-client-dashboard, .user-profile, .row .card", timeout=15000)
                 
-                # Check for success
-                current_url = page.url
-                if "dashboard" in current_url or "tms/me" in current_url or "tms/client" in current_url:
-                    print("[LOGIN] ✅ Login SUCCESS!")
-                    return True
+                # Double check - sometimes we see elements but are still on login? No, wait_for_selector is safe.
+                print("[LOGIN] ✅ Login SUCCESS! (Dashboard detected)")
+                return True
+                
+            except Exception:
+                # Check if we are still on login page or have error
+                if "dashboard" in page.url and await page.locator("app-login").count() > 0:
+                     print(f"[LOGIN] ❌ False positive detected: URL is '{page.url}' but Login Form is visible!")
+                
+                print("[LOGIN] Still on login page or failed to load dashboard elements")
                 
                 # Check for error messages
                 error_selectors = ['.toast-message', '.alert-danger', '.error-message', '.swal2-title']
