@@ -253,4 +253,43 @@ The actor now supports **Real Trading**:
 3. **Run**: The actor will login, place the order, and return the order status + confirmation from the daily order book.
 4. **Safety**: Always verify your order limits and wallet balance before running in `BUY` mode.
 
-Your TMS Actor is now a fully functional Trading Bot! 🚀
+
+## API Usage (HTTP Request)
+To trigger the actor programmatically (e.g., from Postman, Python, or another app), send a **POST** request to the Apify API.
+
+**Endpoint:**
+`https://api.apify.com/v2/acts/<YOUR_USERNAME>~<ACTOR_NAME>/runs?token=<YOUR_APIFY_TOKEN>`
+
+### 1. Buy Request (Example)
+```bash
+curl --request POST \
+  --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "tmsUrl": "https://tms58.nepsetms.com.np",
+    "action": "BUY",
+    "symbol": "NICA",
+    "buyQuantity": 10,
+    "buyPrice": 450,
+    "tmsUsername": "YOUR_USERNAME",
+    "tmsPassword": "YOUR_PASSWORD",
+    "geminiApiKey": "YOUR_GEMINI_KEY"
+}'
+```
+
+### 2. Check Daily Orders (Example)
+```bash
+curl --request POST \
+  --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "tmsUrl": "https://tms58.nepsetms.com.np",
+    "action": "CHECK_ORDERS",
+    "tmsUsername": "YOUR_USERNAME",
+    "tmsPassword": "YOUR_PASSWORD",
+    "geminiApiKey": "YOUR_GEMINI_KEY"
+}'
+```
+
+> **Note**: For security, it is recommended to store sensitive values (passwords, keys) in **Apify Secrets** or defaults if possible, but you can pass them in the body as shown above for full control.
+

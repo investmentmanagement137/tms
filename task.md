@@ -31,6 +31,7 @@
 - [x] Code Structure Verified
 - [x] Document Apify Actor setup instructions
 - [x] Provide deployment guide
+- [x] Document API Usage (curl examples)
 
 ## GitHub Repository Setup
 - [x] Remove hardcoded credentials from trade_book.py
