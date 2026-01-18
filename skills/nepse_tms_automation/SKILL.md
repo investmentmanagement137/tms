@@ -52,17 +52,17 @@ TMS uses basic fingerprinting and WAF rules.
 
 ## 🛒 Order Entry Logic
 
-*   **URL**: `{BASE_URL}/tms/n/order/order-entry`
+*   **URL**: `{BASE_URL}/tms/me/memberclientorderentry`
 *   **Selectors**:
     *   **Buy Tab**: `//a[contains(text(), 'Buy')]` or `.btn-buy`
     *   **Sell Tab**: `//a[contains(text(), 'Sell')]` or `.btn-sell`
+    *   **Instrument**: `select[name='instrument']` or NG-Select via `text='INST'`.
     *   **Symbol Input**: `input[name="symbol"]` (Requires `Tab` press to trigger autocomplete fetch).
     *   **Quantity**: `input[name="quantity"]`
     *   **Price**: `input[name="price"]`
     *   **Submit Button**: `button[type='submit']`, `.btn-primary`
-*   **Success/Error Verification**:
-    *   **Toasts**: `.toast-message` (Contains "Order Placed Successfully" or error details).
-    *   **Alerts**: Handle JS Dialogs (`dialog.accept()`).
+
+    > **On-Page Verification**: After submission, we extract the "Order Book" table (rows `.table tbody tr`) on the same page to confirm the order status immediately, avoiding extra navigation.
 
 ## 📊 Data Extraction (Order Book)
 

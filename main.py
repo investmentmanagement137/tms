@@ -170,14 +170,15 @@ async def main():
                         o_qty = int(order.get('qty', 0))
                         o_price = float(order.get('price', 0))
                         o_side = str(order.get('side')).upper() # BUY or SELL
+                        o_instrument = str(order.get('instrument', 'EQ')).strip().upper()
                         
-                        Actor.log.info(f"Batch Processing: {o_side} {o_symbol} x {o_qty} @ {o_price}")
+                        Actor.log.info(f"Batch Processing: {o_side} {o_symbol} x {o_qty} @ {o_price} ({o_instrument})")
                         
                         res = {}
                         if o_side == 'BUY':
-                            res = await buy_stock.execute(page, tms_url, o_symbol, o_qty, o_price)
+                            res = await buy_stock.execute(page, tms_url, o_symbol, o_qty, o_price, o_instrument)
                         elif o_side == 'SELL':
-                            res = await sell_stock.execute(page, tms_url, o_symbol, o_qty, o_price)
+                            res = await sell_stock.execute(page, tms_url, o_symbol, o_qty, o_price, o_instrument)
                         else:
                             res = {"status": "SKIPPED", "message": f"Invalid side: {o_side}"}
                             

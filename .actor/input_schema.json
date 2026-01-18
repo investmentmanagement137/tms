@@ -66,6 +66,15 @@
             "type": "array",
             "description": "List of orders to execute in BATCH mode.",
             "editor": "json",
+            "prefill": [
+                {
+                    "symbol": "NICA",
+                    "qty": 10,
+                    "price": 450,
+                    "side": "BUY",
+                    "instrument": "EQ"
+                }
+            ],
             "items": {
                 "type": "object",
                 "properties": {
@@ -96,6 +105,13 @@
                             "BUY",
                             "SELL"
                         ]
+                    },
+                    "instrument": {
+                        "title": "Instrument",
+                        "type": "string",
+                        "description": "Instrument Type (EQ, MUTUAL_FUND, etc.)",
+                        "editor": "textfield",
+                        "default": "EQ"
                     }
                 }
             }
