@@ -6,9 +6,9 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
     Navigate to the desktop dashboard first to ensure correct structure.
     Returns a dictionary with keys: fundSummary, tradeSummary, collateralSummary, marketStatus
     """
-    # Navigate to the MOBILE dashboard (m/) since the session is validated there
-    # The /tms/client/dashboard sometimes requires a different session context
-    dashboard_url = f"{tms_url.rstrip('/')}/tms/m/dashboard"
+    # Navigate to the Desktop dashboard (client/) as we have optimized selectors for it
+    # main.py now guarantees a valid session before calling this
+    dashboard_url = f"{tms_url.rstrip('/')}/tms/client/dashboard"
     print(f"[DEBUG] Navigating to Dashboard: {dashboard_url}")
     
     try:
@@ -17,12 +17,6 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
         print(f"[DEBUG] Navigation failed: {e}")
         return {}
 
-    # CRITICAL: Check if we got redirected to login page
-    current_url = page.url
-    if "login" in current_url.lower() or "forgot" in current_url.lower():
-        print(f"[DEBUG] Redirected to login page! Session invalid. URL: {current_url}")
-        return {}  # Cannot extract, session is dead
-        
     try:
         # Wait for "Loading..." overlay to go away if it exists
         try:

@@ -89,7 +89,6 @@ async def main():
             await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
             page = await context.new_page()
-            
             try:
                 # 2. Check if Session is Valid (Skip Login?)
                 is_logged_in = False
@@ -97,18 +96,31 @@ async def main():
                      Actor.log.info("Verifying saved session...")
                      try:
                         # Go to a secured page (Dashboard)
-                        await page.goto(f"{tms_url}/tms/m/dashboard", wait_until='networkidle', timeout=15000)
-                        if "login" not in page.url and ("dashboard" in page.url or "tms" in page.url):
-                            Actor.log.info("Session is VALID! Skipping login.")
-                            is_logged_in = True
-                        else:
-                            Actor.log.warning("Saved session expired or invalid.")
-                     except:
-                        Actor.log.warning("Session verification failed (timeout).")
-                        # DO NOT return, just mark as not logged in.
+                        # We use Client dashboard for verification now as that's our target
+                        verify_url = f"{tms_url}/tms/client/dashboard"
+                        await page.goto(verify_url, wait_until='networkidle', timeout=20000)
+                        
+                        # CRITICAL: Check for specific dashboard elements, not just URL
+                        # SPA might show login form while URL remains /dashboard
+                        try:
+                            # Look for sidebar icon, top bar, or dashboard box
+                            await page.wait_for_selector(".nf-dashboard, .box, app-dashboard, .user-profile", state='attached', timeout=8000)
+                            
+                            if "login" not in page.url:
+                                Actor.log.info("Session is VALID! Found dashboard elements.")
+                                is_logged_in = True
+                            else:
+                                Actor.log.warning("Session URL indicates login despite elements (ambiguous). Marking invalid.")
+                        except:
+                            Actor.log.warning("Dashboard elements NOT found. Session expired.")
+                            is_logged_in = False
+
+                     except Exception as nav_err:
+                        Actor.log.warning(f"Session verification navigation failed: {nav_err}")
                         is_logged_in = False
-                        # If the page failed to load or got stuck, let's close context and retry clean
-                        # But simplest is to just proceed to login logic.
+            except Exception as e:
+                Actor.log.error(f"Error during Session Verification block: {e}")
+                is_logged_in = False
                 
                 # 3. Perform Login (if not logged in)
                 if not is_logged_in:
