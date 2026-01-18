@@ -82,15 +82,19 @@
                 "type": "object",
                 "properties": {
                     "symbol": {
+                        "title": "Symbol",
                         "type": "string"
                     },
                     "qty": {
+                        "title": "Quantity",
                         "type": "integer"
                     },
                     "price": {
+                        "title": "Price",
                         "type": "number"
                     },
                     "side": {
+                        "title": "Side (BUY/SELL)",
                         "type": "string",
                         "enum": [
                             "BUY",
