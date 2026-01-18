@@ -18,7 +18,7 @@ This skill documents the structure, logic, and automation strategies for the NEP
 
 TMS uses CAPTCHA protected login and standard session cookies.
 
-### 1. Login Logic
+### 1. Login Logic (Robust)
 *   **URL**: `{BASE_URL}/login`
 *   **Selectors**:
     *   **Username**: `input[placeholder="Client Code/ User Name"]` OR `input[name="username"]`
@@ -26,19 +26,20 @@ TMS uses CAPTCHA protected login and standard session cookies.
     *   **Captcha Image**: `img.captcha-image-dimension`
     *   **Captcha Input**: `#captchaEnter`
     *   **Login Button**: `.login__button`
-*   **Flow**:
-    1.  Navigate to `/login`.
-    2.  Check if redirected to `/tms/m/dashboard` (Already logged in?).
-    3.  Solve Captcha (Download image -> Gemini API).
-    4.  Fill Credentials & Captcha -> Click Login.
-    5.  Wait for URL to contain `dashboard` or `tms/me`.
+*   **Critical Verification Step**:
+    *   **Dashboard Check**: Do NOT trust `page.url == .../dashboard`. You MUST verify `page.wait_for_selector(".nf-dashboard, .user-profile", timeout=15000)`.
+    *   **False Positive Handling**: If URL is dashboard but elements missing -> Force Navigate to `/login`.
+*   **Failure Recovery**:
+    *   **Slow Server**: Navigate with `timeout=30000` (domcontentloaded).
+    *   **Stuck Loading**: If navigation fails, use CDP `Network.clearBrowserCache` (Hard Reload) and retry.
+    *   **Captcha Error**: If Gemini returns "Unable to read...", Reload page for fresh image.
 
-### 2. Session Persistence (Cookie Strategy)
-*   **Valid Session Indicator**: Accessing `/tms/m/dashboard` returns status 200 and does NOT redirect to `/login`.
-*   **Storage**: Save `context.storage_state()` (cookies + localStorage).
-*   **Re-use**: Load storage state on initialization. If accessing specific page fails (403/Redirect), clear cookies and perform full login.
+### 2. Session Persistence
+*   **Valid Session**: Accessing `/tms/client/dashboard` loads successfully AND renders `.user-profile` / `.nf-dashboard`.
+*   **Invalid Session**: Redirects to `/login` OR loads empty page (False Positive Dashboard).
+*   **Strategy**: Load `context.storage_state()`. Verify strictly. If verification fails, `context.clear_cookies()` and full re-login.
 
-## 🛡️ Anti-Bot Evasion (Stealth)
+## �️ Anti-Bot Evasion (Stealth)
 
 TMS uses basic fingerprinting and WAF rules.
 *   **Detection Triggers**: `navigator.webdriver` property.
@@ -97,13 +98,17 @@ It is critical to distinguish between the two types of "Order" tables:
 | `Net::ERR_ABORTED` | Session invalid mid-request | Clear cookies and re-login. |
 | `Fake Dashboard URL` | App shows `/dashboard` URL but renders Login page (Guard Redirect) | **Do not trust URL.** Check for elements like `.user-profile` or `app-dashboard`. |
 
-## 📝 Dashboard Data Extraction
- 
+## �📝 Dashboard Data Extraction
+
 *   **URL**: `{BASE_URL}/tms/client/dashboard`
-*   **Method**: `page.evaluate()` to scrape dynamic Angular text content.
-*   **Key Selectors**:
-    *   **Collateral Amount**: `span.figure-label` containing "Collateral Amount" -> sibling `span.figure-value`.
-    *   **Utilized Collateral**: `span.figure-label` containing "Collateral Utilized" -> sibling `span.figure-value`.
-    *   **Available Collateral**: `span.figure-label` containing "Collateral Available" -> sibling `span.figure-value`.
-    *   **Trading Limits**: Extracted from `span.tooltiptext` elements containing "Utilized Trading Limit" or "Available Trading Limit".
+*   **Method**: `page.evaluate()` scraping of Angular bindings.
+*   **Data Points**:
+    *   **Trade Summary**: `app-trade-summary .card-body` (Total Turnover, Buy/Sell Counts).
+    *   **Collateral**: `app-collateral-limit` (Total, Utilized, Available).
+    *   **Market Status**: `.market-status` (OPEN/CLOSED).
+*   **Selectors (Verified)**:
+    *   *Total Collateral*: `span.figure-label:has-text("Total Collateral") + span.figure-value`
+    *   *Available Collateral*: `span.figure-label:has-text("Collateral Available") + span.figure-value`
+    *   *Trade Counts*: `.trade-summary-item .value` inside specific panels.
+*   **Note**: Dashboard loads asynchronously. Wait for `app-client-dashboard` before extracting.
 
