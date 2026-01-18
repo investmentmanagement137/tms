@@ -129,6 +129,11 @@ async def main():
                     if session_state:
                          Actor.log.info("Clearing invalid session state before re-login...")
                          await context.clear_cookies()
+                         # Recreate page to avoid ERR_ABORTED crash
+                         Actor.log.info("Recreating page after session clear...")
+                         await page.close()
+                         page = await context.new_page()
+                         await page.wait_for_timeout(1000)  # Stabilization delay
                     
                     Actor.log.info('Executing Login Script...')
                     success = await login.login(page, tms_username, tms_password, gemini_api_key, tms_url)
