@@ -126,22 +126,36 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         submit_clicked = False
         
         # The submit button is within the order entry form - target specifically
-        # It's a btn-primary btn-lg that is NOT disabled and is AFTER the price input
+        # Analysis shows it might just be 'btn btn-sm' with text '-' (icon) and type='submit'
+        # It is NOT always btn-primary
         submit_selectors = [
-            ".box-order-entry button.btn-primary.btn-lg:not([disabled])",  # Within order entry box
-            "form button.btn-primary.btn-lg:not([disabled])",  # Within any form
-            ".order-entry-form button.btn-primary:not([disabled])",
-            "button.btn-primary.btn-lg:not([disabled]):not(:has-text('Update')):not(:has-text('Close'))",
+            ".box-order-entry button[type='submit']",
+            ".order__form button[type='submit']", 
+            ".box-order-entry button.btn-sm:not(.btn-default)",
+            ".order__form button.btn-sm:not(.btn-default)",
+            "button.btn-sm:has-text('-')", # Fallback for icon button
+            "button.btn-primary.btn-lg:not([disabled])", # Old fallback
         ]
         
         for selector in submit_selectors:
             try:
-                btn = page.locator(selector).first
-                if await btn.count() > 0 and await btn.is_visible():
-                    await btn.click()
-                    print(f"[DEBUG] Clicked submit button with selector: {selector}")
-                    submit_clicked = True
-                    break
+                # Get all matches
+                btns = page.locator(selector)
+                count = await btns.count()
+                
+                for i in range(count):
+                    btn = btns.nth(i)
+                    if await btn.is_visible() and await btn.is_enabled():
+                        # Check if it's not a cancel button
+                        txt = await btn.text_content()
+                        if txt and ("cancel" in txt.lower() or "close" in txt.lower()):
+                            continue
+                            
+                        await btn.click()
+                        print(f"[DEBUG] Clicked submit button with selector: {selector} (Index {i})")
+                        submit_clicked = True
+                        break
+                if submit_clicked: break
             except Exception as e:
                 print(f"[DEBUG] Selector {selector} failed: {str(e)[:50]}")
                 continue
