@@ -44,21 +44,21 @@
             ]
         },
         "symbol": {
-            "title": "Stock Symbol",
+            "title": "Stock Symbol (Single Mode)",
             "type": "string",
-            "description": "The stock symbol to buy (Required for BUY action)",
+            "description": "The stock symbol to trade (For Single Order Mode)",
             "editor": "textfield"
         },
         "buyPrice": {
-            "title": "Buy Price",
+            "title": "Buy Price (Single Mode)",
             "type": "integer",
-            "description": "Price per unit to buy at",
+            "description": "Price per unit (For Single Order Mode)",
             "editor": "number"
         },
         "buyQuantity": {
-            "title": "Buy Quantity",
+            "title": "Buy Quantity (Single Mode)",
             "type": "integer",
-            "description": "Number of units to buy",
+            "description": "Number of units (For Single Order Mode)",
             "editor": "number"
         },
         "sellPrice": {
