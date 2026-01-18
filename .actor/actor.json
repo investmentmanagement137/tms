@@ -3,7 +3,7 @@
   "name": "tms-trade-book-scraper",
   "title": "TMS Trade Book History Scraper",
   "description": "Automated scraper for NEPSE TMS (Trade Management System) Trade Book History with Supabase S3 upload. Uses Gemini AI for CAPTCHA solving.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "meta": {
     "templateId": "python-chrome"
   },
