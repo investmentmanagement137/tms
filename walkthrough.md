@@ -324,13 +324,13 @@ curl --request POST \
   --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
   --header 'Content-Type: application/json' \
   --data '{
-    "tmsUrl": "https://tms58.nepsetms.com.np",
     "action": "BUY",
     "symbol": "NICA",
     "buyQuantity": 10,
     "buyPrice": 450
 }'
 ```
+*Credentials AND `tmsUrl` are automatically pulled from your saved Actor configuration.*
 ### 4. Batch Trading (Multiple Orders)
 To buy/sell multiple stocks in one run:
 ```bash
