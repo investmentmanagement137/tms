@@ -210,6 +210,20 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             
             result["orderBook"] = order_book
             print(f"[DEBUG] Extracted {len(order_book)} order book entries")
+
+            if len(order_book) == 0:
+                 print("[DEBUG] Order book empty! Saving debug info to Store...")
+                 try:
+                     from apify import Actor
+                     # Dump HTML
+                     html_content = await page.content()
+                     await Actor.set_value('order_entry_dump.html', html_content, content_type='text/html')
+                     # Capture Screenshot
+                     png_data = await page.screenshot(full_page=True)
+                     await Actor.set_value('order_entry_fail.png', png_data, content_type='image/png')
+                     print("[DEBUG] Saved order_entry_dump.html and order_entry_fail.png")
+                 except Exception as dump_err:
+                     print(f"[DEBUG] Failed to save debug dump: {dump_err}")
             
         except Exception as e:
             print(f"[DEBUG] Order book extraction failed: {e}")
