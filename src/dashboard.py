@@ -6,21 +6,29 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
     Navigate to the desktop dashboard first to ensure correct structure.
     Returns a dictionary with keys: fundSummary, tradeSummary, collateralSummary, marketStatus
     """
-    dashboard_url = f"{tms_url.rstrip('/')}/tms/client/dashboard"
-    print(f"[DEBUG] Navigating to Dashboard: {dashboard_url}")
-    
+    # Defensive: Verify we are actually on a dashboard-like page or navigate
+    current_url = page.url
+    if "dashboard" not in current_url and "tms" not in current_url:
+        print(f"[DEBUG] Current URL {current_url} does not look like dashboard. Attempting nav...")
+        dashboard_url = f"{tms_url.rstrip('/')}/tms/client/dashboard"
+        try:
+            await page.goto(dashboard_url, wait_until='networkidle', timeout=30000)
+        except Exception as e:
+            print(f"[DEBUG] Navigation failed: {e}")
+
     try:
-        await page.goto(dashboard_url, wait_until='networkidle')
-        await page.wait_for_selector('.card-header, .figure', timeout=10000)
+        # Increased timeout to 30s
+        await page.wait_for_selector(".card-header, .figure, .total-count", timeout=30000)
         await page.wait_for_timeout(2000) # Extra buffer for dynamic values
     except Exception as e:
-        print(f"[DEBUG] Error loading dashboard: {e}")
-        return {}
-
+        print(f"[DEBUG] Error loading dashboard elements: {e}")
+        # We don't return here, we try extraction anyway, it might partially work or we catch it below
+        
     print("Extracting dashboard data...")
-    
-    # We use page.evaluate to run extraction logic in the browser context
-    data = await page.evaluate("""() => {
+
+    try:
+        # We use page.evaluate to run extraction logic in the browser context
+        data = await page.evaluate("""() => {
         const result = {
             fundSummary: {},
             tradeSummary: {},
@@ -118,6 +126,11 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
         return result;
     }""")
     
+    except Exception as e:
+        print(f"[DEBUG] JS execution failed or timed out: {e}")
+        # Return empty structure or verify failure in caller
+        data = {}
+
     # Post-process results for logging
     if data:
         print(f"[DEBUG] Dashboard: Status={data.get('marketStatus')}")

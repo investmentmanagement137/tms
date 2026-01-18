@@ -143,13 +143,34 @@ async def main():
                 # We are logged in now (either via session or fresh login)
                 Actor.log.info("Extracting Dashboard Data...")
                 try:
-                    # Ensure we are on dashboard or navigate there?
                     # extract_dashboard_data runs on current page
                     dash_data = await dashboard.extract_dashboard_data(page, tms_url)
+                    
+                    # VALIDATION: Check if data is empty or missing key fields
+                    if not dash_data or not dash_data.get('tradeSummary'):
+                        Actor.log.warning("Dashboard data is empty or incomplete! Saving debug info...")
+                        # Dump HTML
+                        try:
+                            html = await page.content()
+                            await Actor.set_value('dashboard_fail_dump.html', html, content_type='text/html')
+                            # Screenshot
+                            screenshot = await page.screenshot(full_page=True)
+                            await Actor.set_value('dashboard_fail.png', screenshot, content_type='image/png')
+                            Actor.log.info("Saved dashboard_fail_dump.html and dashboard_fail.png to Key-Value Store.")
+                        except Exception as dump_err:
+                            Actor.log.error(f"Failed to save debug info: {dump_err}")
+                    
                     final_output["dashboard"] = dash_data
-                    Actor.log.info("Dashboard data extracted.")
+                    Actor.log.info(f"Dashboard data extracted: {len(dash_data) if dash_data else 0} sections.")
+                    
                 except Exception as e:
-                     Actor.log.warning(f"Dashboard extraction failed: {e}")
+                     Actor.log.error(f"Dashboard extraction raised exception: {e}")
+                     # Dump on exception too
+                     try:
+                         await Actor.set_value('dashboard_error_dump.html', await page.content(), content_type='text/html')
+                         await Actor.set_value('dashboard_error.png', await page.screenshot(full_page=True), content_type='image/png')
+                     except: 
+                         pass
 
                 # Check for Batch Orders / BATCH action
                 batch_orders = actor_input.get('orders', [])
