@@ -64,6 +64,20 @@ TMS uses basic fingerprinting and WAF rules.
 
     > **On-Page Verification**: After submission, we extract the "Order Book" table (rows `.table tbody tr`) on the same page to confirm the order status immediately, avoiding extra navigation.
 
+## 📚 Terminology & Data Structures
+
+It is critical to distinguish between the two types of "Order" tables:
+
+1.  **Order Book (User's Orders)**:
+    *   **Definition**: The list of orders *placed by the logged-in user*. Contains your Open, Executed, and Cancelled orders.
+    *   **Targeted by this Skill**: YES. We extract this to verify if our automated orders were submitted successfully.
+    *   **Selectors**: `.k-grid-content tbody tr` (Data rows), `.k-grid-header` (Headers).
+
+2.  **Market Depth (Top 5 Buy/Sell)**:
+    *   **Definition**: The live list of the best 5 Buy and Sell orders *from the entire market* for a specific security.
+    *   **Targeted by this Skill**: NO. We do explicitly ignore this data to avoid confusion.
+    *   **Note**: Often displayed in a separate panel or popup. Do not confuse this with your personal Order Book.
+
 ## 📊 Data Extraction (Order Book)
 
 *   **URL**: `{BASE_URL}/tms/n/order/order-book`
@@ -83,8 +97,8 @@ TMS uses basic fingerprinting and WAF rules.
 | `Net::ERR_ABORTED` | Session invalid mid-request | Clear cookies and re-login. |
 
 ## 📝 Dashboard Data Extraction
-
-*   **URL**: `{BASE_URL}/tms/m/dashboard`
+ 
+*   **URL**: `{BASE_URL}/tms/client/dashboard`
 *   **Method**: `page.evaluate()` to scrape dynamic Angular text content.
 *   **Key Selectors**:
     *   **Collateral Amount**: `span.figure-label` containing "Collateral Amount" -> sibling `span.figure-value`.
