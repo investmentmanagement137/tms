@@ -36,12 +36,11 @@
             "type": "string",
             "description": "What operation to perform?",
             "editor": "select",
-            "default": "CHECK_ORDERS",
+            "default": "BATCH",
             "enum": [
                 "BUY",
                 "SELL",
-                "BATCH",
-                "CHECK_ORDERS"
+                "BATCH"
             ]
         },
         "symbol": {
