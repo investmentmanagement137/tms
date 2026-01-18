@@ -83,19 +83,27 @@
                 "properties": {
                     "symbol": {
                         "title": "Symbol",
-                        "type": "string"
+                        "type": "string",
+                        "description": "Stock Symbol (e.g. NICA)",
+                        "editor": "textfield"
                     },
                     "qty": {
                         "title": "Quantity",
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "Number of units",
+                        "editor": "number"
                     },
                     "price": {
                         "title": "Price",
-                        "type": "number"
+                        "type": "number",
+                        "description": "Price per unit",
+                        "editor": "number"
                     },
                     "side": {
                         "title": "Side (BUY/SELL)",
                         "type": "string",
+                        "description": "Action to perform",
+                        "editor": "select",
                         "enum": [
                             "BUY",
                             "SELL"
