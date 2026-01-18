@@ -158,7 +158,31 @@ async def main():
                     Actor.log.info("Saving session state to 'tms-sessions'...")
                     storage_state = await context.storage_state()
                     await session_store.set_value('SESSION', storage_state)
-                
+            
+            except Exception as login_err:
+                 Actor.log.error(f"Login process failed with error: {login_err}")
+                 await Actor.fail("Login process crashed")
+                 return
+
+            # --- STRICT FINAL VERIFICATION ---
+            # User Request: "make 100% sure user is logged in" before running any script
+            Actor.log.info("Performing final strict login check...")
+            try:
+                 # Check for dashboard elements one last time
+                 await page.wait_for_selector("app-client-dashboard, .user-profile, .row .card", timeout=10000)
+            except Exception as e:
+                 Actor.log.error("CRITICAL: Final login verification failed! Dashboard elements missing.")
+                 # Capture debug state
+                 try:
+                     await Actor.set_value('login_fail_final.png', await page.screenshot(full_page=True), 'image/png')
+                     await Actor.set_value('login_fail_final.html', await page.content(), 'text/html')
+                 except: pass
+                 await Actor.fail("Login Verification Failed (Final Check)")
+                 return
+            Actor.log.info("✅ Final Verification Passed. Proceeding to Actions.")
+            # ---------------------------------
+            
+            try:
                 # 5. Initialize Output Dict
                 final_output = {
                     "version": VERSION,
