@@ -60,59 +60,120 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             buy_tab = page.locator("xpath=//a[contains(text(), 'Buy')]").first
             if await buy_tab.is_visible():
                 await buy_tab.click()
+                print("[DEBUG] Clicked Buy tab via xpath")
             else:
-                # Fallback
                 await page.click(".btn-buy, .buy-tab")
-        except:
-             # Maybe already on Buy? Or structured differently. Proceed.
-             print("[DEBUG] Buy tab selection exception (ignoring)")
+                print("[DEBUG] Clicked Buy tab via fallback selector")
+        except Exception as e:
+            print(f"[DEBUG] Buy tab selection exception (ignoring): {e}")
 
-        print("[DEBUG] Selected BUY tab")
+        print("[DEBUG] Proceeding to fill order form...")
         
         # 3. Enter Symbol
-        print(f"[DEBUG] Entering Symbol: {symbol}")
-        # Confirmed Selector: input[formcontrolname='symbol']
-        await page.click("input[formcontrolname='symbol']")
-        await page.fill("input[formcontrolname='symbol']", symbol)
+        print(f"[DEBUG] Step 3: Entering Symbol: {symbol}")
+        symbol_input = page.locator("input[formcontrolname='symbol']")
+        if await symbol_input.is_visible():
+            print("[DEBUG] Symbol input FOUND and VISIBLE")
+            await symbol_input.click()
+            await symbol_input.fill(symbol)
+            print(f"[DEBUG] Symbol filled: {symbol}")
+        else:
+            print("[DEBUG] WARNING: Symbol input NOT VISIBLE!")
         await page.keyboard.press("Tab") 
         await page.wait_for_timeout(1500) 
         await page.keyboard.press("Enter")
+        print("[DEBUG] Symbol entry complete (Tab + Enter pressed)")
         
         # 4. Enter Quantity
-        print(f"[DEBUG] Entering Quantity: {quantity}")
-        await page.fill("input[formcontrolname='quantity']", str(quantity))
+        print(f"[DEBUG] Step 4: Entering Quantity: {quantity}")
+        qty_input = page.locator("input[formcontrolname='quantity']")
+        if await qty_input.is_visible():
+            print("[DEBUG] Quantity input FOUND and VISIBLE")
+            await qty_input.fill(str(quantity))
+            print(f"[DEBUG] Quantity filled: {quantity}")
+        else:
+            print("[DEBUG] WARNING: Quantity input NOT VISIBLE!")
 
         # 5. Enter Price
-        print(f"[DEBUG] Entering Price: {price}")
-        await page.fill("input[formcontrolname='price']", str(price))
+        print(f"[DEBUG] Step 5: Entering Price: {price}")
+        price_input = page.locator("input[formcontrolname='price']")
+        if await price_input.is_visible():
+            print("[DEBUG] Price input FOUND and VISIBLE")
+            await price_input.fill(str(price))
+            print(f"[DEBUG] Price filled: {price}")
+        else:
+            print("[DEBUG] WARNING: Price input NOT VISIBLE!")
         
         await page.wait_for_timeout(500)
         
         # 6. Click BUY toggle (required - neutral state won't submit)
-        print("[DEBUG] Clicking BUY toggle...")
-        # The toggle is a SELL/BUY switch - must click the BUY side
-        try:
-            # Look for BUY label/button near toggle, or the toggle itself when it has BUY text
-            buy_toggle = page.locator("text=BUY").first
-            if await buy_toggle.is_visible():
-                await buy_toggle.click()
-                print("[DEBUG] Clicked BUY toggle")
-            else:
-                # Fallback: try toggle switch with .buy class or similar
-                toggle = page.locator(".toggle-buy, .buy-toggle, label:has-text('BUY')").first
+        print("[DEBUG] Step 6: Looking for BUY toggle...")
+        
+        # Try multiple selectors for the toggle
+        toggle_selectors = [
+            "text=BUY",
+            "span:text('BUY')",
+            ".buy-label",
+            "label:has-text('BUY')",
+            ".toggle-right",
+            ".slider:has-text('BUY')",
+            "[class*='buy']",
+        ]
+        
+        toggle_clicked = False
+        for sel in toggle_selectors:
+            try:
+                toggle = page.locator(sel).first
                 if await toggle.is_visible():
                     await toggle.click()
-                    print("[DEBUG] Clicked BUY toggle (fallback)")
-        except Exception as e:
-            print(f"[DEBUG] Toggle click attempt: {e}")
+                    toggle_clicked = True
+                    print(f"[DEBUG] BUY toggle clicked using selector: {sel}")
+                    break
+            except:
+                pass
         
-        await page.wait_for_timeout(300)
+        if not toggle_clicked:
+            print("[DEBUG] WARNING: Could not find BUY toggle with any selector!")
+            # Dump page HTML for debugging
+            try:
+                html = await page.content()
+                with open("order_entry_debug.html", "w", encoding="utf-8") as f:
+                    f.write(html)
+                print("[DEBUG] Page HTML saved to order_entry_debug.html for analysis")
+            except:
+                pass
+        
+        await page.wait_for_timeout(500)
         
         # 7. Click Submit
-        print("[DEBUG] Clicking Buy Button...")
-        submit_btn = page.locator("button[type='submit'], button.btn-primary, button.btn-success").first
-        await submit_btn.click()
-        print("[DEBUG] Clicked Submit.")
+        print("[DEBUG] Step 7: Looking for Submit button...")
+        submit_selectors = [
+            "button[type='submit']",
+            "button.btn-primary",
+            "button.btn-success",
+            "button:has-text('Submit')",
+            "button:has-text('Place Order')",
+            "button:has-text('Buy')",
+        ]
+        
+        submit_clicked = False
+        for sel in submit_selectors:
+            try:
+                btn = page.locator(sel).first
+                if await btn.is_visible():
+                    btn_text = await btn.text_content()
+                    print(f"[DEBUG] Found submit button with selector '{sel}', text: '{btn_text}'")
+                    await btn.click()
+                    submit_clicked = True
+                    print(f"[DEBUG] Submit button clicked using selector: {sel}")
+                    break
+            except Exception as e:
+                print(f"[DEBUG] Selector '{sel}' failed: {e}")
+        
+        if not submit_clicked:
+            print("[DEBUG] ERROR: Could not click any submit button!")
+        else:
+            print("[DEBUG] Submit button CLICKED successfully.")
         
         # 7. Check for Errors/Success (Toast Messages & Popups)
         # Wait a bit for toast/popup
