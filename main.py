@@ -4,7 +4,6 @@ Apify Actor entry point for TMS Order Executor
 import os
 import datetime
 import json
-import boto3
 from apify import Actor
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -15,58 +14,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 from src import utils, login, buy_stock, sell_stock, daily_history
 
 
-def upload_to_supabase(file_path, endpoint, region, access_key, secret_key, bucket_name):
-    """Upload file to Supabase S3"""
-    try:
-        session = boto3.session.Session()
-        s3 = session.client(
-            's3',
-            region_name=region,
-            endpoint_url=endpoint,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key
-        )
-        
-        print(f"Uploading {file_path} to bucket: {bucket_name}")
-        with open(file_path, "rb") as f:
-            s3.upload_fileobj(f, bucket_name, file_path)
-            
-        print(f"Success! File '{file_path}' uploaded successfully.")
-        return True
-        
-    except Exception as e:
-        print(f"Error uploading to Supabase: {e}")
-        return False
-
-
-async def main():
-    async with Actor:
-        # Get input from Apify
-        actor_input = await Actor.get_input() or {}
-        
-        # Extract inputs
-        tms_username = actor_input.get('tmsUsername')
-        tms_password = actor_input.get('tmsPassword')
-        gemini_api_key = actor_input.get('geminiApiKey')
-        tms_url = actor_input.get('tmsUrl')
-        
-        # Sanitize tmsUrl to remove trailing /login or /
-        if tms_url:
-            tms_url = tms_url.strip().rstrip('/')
-            if tms_url.endswith('/login'):
-                tms_url = tms_url[:-6] # Remove /login
-            tms_url = tms_url.rstrip('/') # Clean again
-            
-        action = actor_input.get('action', 'CHECK_ORDERS') # Default to safer option
-        
-        supabase_endpoint = actor_input.get('supabaseEndpoint', '')
-        supabase_region = actor_input.get('supabaseRegion', 'ap-southeast-1')
-        supabase_access_key = actor_input.get('supabaseAccessKey', '')
-        supabase_secret_key = actor_input.get('supabaseSecretKey', '')
-        supabase_bucket_name = actor_input.get('supabaseBucketName', 'investment_management')
-        upload_to_s3 = actor_input.get('uploadToS3', True)
+        action = actor_input.get('action', 'BATCH') # Default to safer option
         
         # Validate Credentials
+
         if not all([tms_username, tms_password, gemini_api_key, tms_url]):
             await Actor.fail('Missing required credentials: tmsUsername, tmsPassword, geminiApiKey, or tmsUrl')
             return
@@ -198,11 +149,6 @@ async def main():
             # Save to Apify Store
             await Actor.set_value('OUTPUT', final_output)
             await Actor.push_data(final_output)
-            
-            # Upload to S3
-            if upload_to_s3 and all([supabase_endpoint, supabase_access_key, supabase_secret_key]):
-                Actor.log.info('Uploading JSON to Supabase S3...')
-                upload_to_supabase(filename, supabase_endpoint, supabase_region, supabase_access_key, supabase_secret_key, supabase_bucket_name)
             
             Actor.log.info('✅ Workflow Completed Successfully!')
             
