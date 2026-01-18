@@ -94,17 +94,58 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             result["status"] = "SUBMITTED"
             result["message"] = "Order submitted successfully"
             
-            # --- 8. EXTRACT ON-PAGE ORDER BOOK ---
+            # --- 8. EXTRACT ON-PAGE ORDER BOOK (With Refresh & Actions) ---
+            print("[DEBUG] Refreshing On-Page Order Book...")
             try:
+                # 1. Click Refresh Button
+                refresh_btn = page.locator(".fa-refresh, button:has(.fa-refresh), .icon-refresh, button[title='Refresh']").last
+                if await refresh_btn.is_visible():
+                    await refresh_btn.click()
+                    await page.wait_for_timeout(1000)
+                else:
+                    print("[DEBUG] Refresh button not found.")
+
+                # 2. Scrape Table with Actions
                 rows = page.locator(".table tbody tr")
                 count = await rows.count()
-                order_book = []
-                for i in range(min(count, 5)):
-                    row_txt = await rows.nth(i).inner_text()
-                    if "No records available" in row_txt:
+                order_book_entries = []
+                
+                for i in range(min(count, 10)):
+                    row = rows.nth(i)
+                    row_text = await row.inner_text()
+                    
+                    if "No records available" in row_text:
                         break
-                    order_book.append(row_txt.replace('\n', '|'))
-                result["orderBook"] = order_book
+                    
+                    cells = row.locator("td")
+                    cell_count = await cells.count()
+                    row_data = []
+                    action_links = []
+                    
+                    for j in range(cell_count):
+                        cell = cells.nth(j)
+                        text = (await cell.inner_text()).strip()
+                        row_data.append(text)
+                        
+                        links = cell.locator("a, button")
+                        if await links.count() > 0:
+                            for k in range(await links.count()):
+                                link = links.nth(k)
+                                href = await link.get_attribute("href")
+                                title = await link.get_attribute("title")
+                                if href and href != "#":
+                                    action_links.append(f"Link: {href}")
+                                elif title:
+                                    action_links.append(f"Action: {title}")
+                    
+                    order_book_entries.append({
+                        "row_text": " | ".join(row_data),
+                        "actions": action_links
+                    })
+                
+                result["orderBook"] = order_book_entries
+                print(f"[DEBUG] Extracted {len(order_book_entries)} entries.")
+                
             except Exception as e:
                 print(f"Order book check failed: {e}")
             
