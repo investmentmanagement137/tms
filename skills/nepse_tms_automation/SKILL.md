@@ -95,6 +95,7 @@ It is critical to distinguish between the two types of "Order" tables:
 | `403 Forbidden` | WAF detection / Bad User Agent | Enable Stealth args & Init Script. |
 | `Page crashed` | Browser OOM or bad state | catch `page.reload()` errors and restart context. |
 | `Net::ERR_ABORTED` | Session invalid mid-request | Clear cookies and re-login. |
+| `Fake Dashboard URL` | App shows `/dashboard` URL but renders Login page (Guard Redirect) | **Do not trust URL.** Check for elements like `.user-profile` or `app-dashboard`. |
 
 ## 📝 Dashboard Data Extraction
  
