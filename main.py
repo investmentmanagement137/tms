@@ -34,7 +34,7 @@ async def main():
         
         # Validate Credentials
         if not all([tms_username, tms_password, gemini_api_key, tms_url]):
-            await Actor.fail('Missing required credentials: tmsUsername, tmsPassword, geminiApiKey, or tmsUrl')
+            await Actor.fail(status_message='Missing required credentials: tmsUsername, tmsPassword, geminiApiKey, or tmsUrl')
             return
 
         Actor.log.info(f'Starting TMS Actor: Action = {action} on {tms_url}')
@@ -137,7 +137,7 @@ async def main():
 
                 if (action == 'BATCH' or (batch_orders and len(batch_orders) > 0)):
                     if not batch_orders:
-                        await Actor.fail('Action is BATCH but "orders" list is empty!')
+                        await Actor.fail(status_message='Action is BATCH but "orders" list is empty!')
                         return
 
                     Actor.log.info(f"Processing Batch of {len(batch_orders)} orders...")
