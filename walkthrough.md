@@ -331,5 +331,24 @@ curl --request POST \
     "buyPrice": 450
 }'
 ```
-*Credentials are automatically pulled from your saved Actor configuration.*
+### 4. Batch Trading (Multiple Orders)
+To buy/sell multiple stocks in one run:
+```bash
+curl --request POST \
+  --url 'https://api.apify.com/v2/acts/YOUR_USERNAME~tms-actor/runs?token=YOUR_APIFY_TOKEN' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "tmsUrl": "https://tms58.nepsetms.com.np",
+    "checkOrders": true,
+    "orders": [
+        { "symbol": "NICA", "qty": 10, "price": 450, "side": "BUY" },
+        { "symbol": "HIDCL", "qty": 50, "price": 200, "side": "SELL" }
+    ],
+    "tmsUsername": "USER",
+    "tmsPassword": "PASS",
+    "geminiApiKey": "KEY"
+}'
+```
+**Optimized**: verification runs only **ONCE** at the end.
+
 

@@ -93,10 +93,13 @@ async def main():
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
+        # --- Versioning ---
+        VERSION = "1.1.0"
+        Actor.log.info(f"TMS Actor Version: {VERSION}")
+        
         try:
             # 1. Perform Login
             Actor.log.info('Executing Login Script...')
-            # tmsUrl is passed from input
             success = login.login(driver, tms_username, tms_password, gemini_api_key, tms_url)
             
             if not success:
@@ -106,84 +109,74 @@ async def main():
             Actor.log.info('Login successful!')
             
             final_output = {
-                "action": action,
+                "version": VERSION,
                 "status": "SUCCESS",
-                "timestamp": str(datetime.datetime.now())
+                "timestamp": str(datetime.datetime.now()),
+                "batch_results": []
             }
 
-            # 2. Execute Action
-            if action == 'BUY':
-                symbol = actor_input.get('symbol')
-                buy_price = actor_input.get('buyPrice')
-                buy_quantity = actor_input.get('buyQuantity')
-                
-                if not all([symbol, buy_price, buy_quantity]):
-                    await Actor.fail('For BUY action, you must provide: symbol, buyPrice, buyQuantity')
-                    return
-                
-                # Clean inputs
-                symbol = str(symbol).strip().upper()
-                try:
-                    buy_price = float(buy_price)
-                    buy_quantity = int(buy_quantity)
-                except ValueError:
-                    await Actor.fail('buyPrice must be a number and buyQuantity must be an integer.')
-                    return
-
-                Actor.log.info('Executing Buy Stock Script...')
-                order_result = buy_stock.execute(driver, tms_url, symbol, buy_quantity, buy_price)
-                
-                final_output.update(order_result)
-                
-                # Check Orders after buying (Optional)
-                check_orders = actor_input.get('checkOrders', True)
-                if check_orders:
-                    Actor.log.info('Executing Daily History Script (Verification)...')
-                    orders = daily_history.extract(driver, tms_url)
-                    final_output["todaysOrderPage"] = orders
-                else:
-                    Actor.log.info('Skipping order verification (checkOrders=False)')
-
-            elif action == 'SELL':
-                symbol = actor_input.get('symbol')
-                sell_price = actor_input.get('sellPrice')
-                sell_quantity = actor_input.get('sellQuantity')
-                
-                if not all([symbol, sell_price, sell_quantity]):
-                    await Actor.fail('For SELL action, you must provide: symbol, sellPrice, sellQuantity')
-                    return
-                
-                # Clean inputs
-                symbol = str(symbol).strip().upper()
-                try:
-                    sell_price = float(sell_price)
-                    sell_quantity = int(sell_quantity)
-                except ValueError:
-                    await Actor.fail('sellPrice must be a number and sellQuantity must be an integer.')
-                    return
-
-                Actor.log.info('Executing Sell Stock Script...')
-                order_result = sell_stock.execute(driver, tms_url, symbol, sell_quantity, sell_price)
-                
-                final_output.update(order_result)
-                
-                # Check Orders after selling (Optional)
-                check_orders = actor_input.get('checkOrders', True)
-                if check_orders:
-                    Actor.log.info('Executing Daily History Script (Verification)...')
-                    orders = daily_history.extract(driver, tms_url)
-                    final_output["todaysOrderPage"] = orders
-                else:
-                    Actor.log.info('Skipping order verification (checkOrders=False)')
-
-            elif action == 'CHECK_ORDERS':
-                Actor.log.info('Executing Daily History Script...')
-                orders = daily_history.extract(driver, tms_url)
-                final_output["todaysOrderPage"] = orders
+            # Check for Batch Orders
+            batch_orders = actor_input.get('orders', [])
+            check_orders_flag = actor_input.get('checkOrders', True)
             
+            executed_any_order = False
+
+            if batch_orders and isinstance(batch_orders, list) and len(batch_orders) > 0:
+                Actor.log.info(f"Processing Batch of {len(batch_orders)} orders...")
+                
+                for order in batch_orders:
+                    o_symbol = str(order.get('symbol')).strip().upper()
+                    o_qty = int(order.get('qty', 0))
+                    o_price = float(order.get('price', 0))
+                    o_side = str(order.get('side')).upper() # BUY or SELL
+                    
+                    Actor.log.info(f"Batch Processing: {o_side} {o_symbol} x {o_qty} @ {o_price}")
+                    
+                    res = {}
+                    if o_side == 'BUY':
+                        res = buy_stock.execute(driver, tms_url, o_symbol, o_qty, o_price)
+                    elif o_side == 'SELL':
+                        res = sell_stock.execute(driver, tms_url, o_symbol, o_qty, o_price)
+                    else:
+                        res = {"status": "SKIPPED", "message": f"Invalid side: {o_side}"}
+                        
+                    final_output["batch_results"].append(res)
+                    executed_any_order = True
+                    time.sleep(1) # Brief pause between orders
+
             else:
-                Actor.log.warning(f"Unknown action: {action}")
-                final_output["message"] = "Unknown action"
+                # Fallback to Single Action Logic (Legacy/Single Mode)
+                if action == 'BUY':
+                    symbol = actor_input.get('symbol')
+                    buy_price = actor_input.get('buyPrice')
+                    buy_quantity = actor_input.get('buyQuantity')
+                    
+                    if all([symbol, buy_price, buy_quantity]):
+                        Actor.log.info('Executing Single BUY...')
+                        order_result = buy_stock.execute(driver, tms_url, str(symbol).strip().upper(), int(buy_quantity), float(buy_price))
+                        final_output["batch_results"].append(order_result)
+                        executed_any_order = True
+                
+                elif action == 'SELL':
+                    symbol = actor_input.get('symbol')
+                    sell_price = actor_input.get('sellPrice')
+                    sell_quantity = actor_input.get('sellQuantity')
+                     
+                    if all([symbol, sell_price, sell_quantity]):
+                        Actor.log.info('Executing Single SELL...')
+                        order_result = sell_stock.execute(driver, tms_url, str(symbol).strip().upper(), int(sell_quantity), float(sell_price))
+                        final_output["batch_results"].append(order_result)
+                        executed_any_order = True
+
+            # Global Verification (Once at the end)
+            if (executed_any_order and check_orders_flag) or action == 'CHECK_ORDERS':
+                 Actor.log.info('Executing Daily History Script (Verification)...')
+                 orders = daily_history.extract(driver, tms_url)
+                 final_output["todaysOrderPage"] = orders
+            else:
+                 Actor.log.info("Skipping verification.")
+            
+
             
             # 3. Save Output
             today = datetime.date.today()

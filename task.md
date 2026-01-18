@@ -33,6 +33,8 @@
 - [x] Provide deployment guide
 - [x] Document API Usage (curl examples)
 - [x] Implement SELL Action and Logic
+- [x] Implement Batch Trading (Input Array)
+- [x] Add Versioning (Log output)
 
 
 ## GitHub Repository Setup

@@ -73,6 +73,33 @@
             "description": "Number of units to sell",
             "editor": "number"
         },
+        "orders": {
+            "title": "Batch Orders",
+            "type": "array",
+            "description": "List of orders to execute in batch. Example: [{'symbol':'NICA', 'qty':10, 'price':400, 'side':'BUY'}]",
+            "editor": "json",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string"
+                    },
+                    "qty": {
+                        "type": "integer"
+                    },
+                    "price": {
+                        "type": "number"
+                    },
+                    "side": {
+                        "type": "string",
+                        "enum": [
+                            "BUY",
+                            "SELL"
+                        ]
+                    }
+                }
+            }
+        },
         "checkOrders": {
             "title": "Check Orders After Buy?",
             "type": "boolean",
