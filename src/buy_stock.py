@@ -109,15 +109,14 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         # 6. Click BUY toggle (required - neutral state won't submit)
         print("[DEBUG] Step 6: Looking for BUY toggle...")
         
-        # Try multiple selectors for the toggle
+        # CORRECT SELECTORS from browser exploration:
+        # BUY toggle: .order__options--buy
+        # SELL toggle: .order__options--sell
         toggle_selectors = [
-            "text=BUY",
+            ".order__options--buy",      # Primary selector found from browser exploration
+            "text=BUY",                  # Fallback text selector
             "span:text('BUY')",
-            ".buy-label",
-            "label:has-text('BUY')",
-            ".toggle-right",
-            ".slider:has-text('BUY')",
-            "[class*='buy']",
+            "[class*='options--buy']",   # Partial class match
         ]
         
         toggle_clicked = False
@@ -143,17 +142,14 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             except:
                 pass
         
-        await page.wait_for_timeout(500)
-        
         # 7. Click Submit
         print("[DEBUG] Step 7: Looking for Submit button...")
+        # Submit button is the button before CANCEL button (.btn-default.btn-sm)
         submit_selectors = [
-            "button[type='submit']",
-            "button.btn-primary",
-            "button.btn-success",
-            "button:has-text('Submit')",
-            "button:has-text('Place Order')",
-            "button:has-text('Buy')",
+            "button.btn-sm:not(.btn-default)",    # Primary: small button that's not cancel
+            "button.btn-primary.btn-sm",          # Primary button small 
+            "button:has-text('BUY')",             # Button with BUY text
+            "button[type='submit']",              # Standard submit
         ]
         
         submit_clicked = False

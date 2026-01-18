@@ -67,27 +67,58 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         await page.wait_for_timeout(500)
         
         # 6. Click SELL toggle (required - neutral state won't submit)
-        print("[DEBUG] Clicking SELL toggle...")
-        try:
-            sell_toggle = page.locator("text=SELL").first
-            if await sell_toggle.is_visible():
-                await sell_toggle.click()
-                print("[DEBUG] Clicked SELL toggle")
-            else:
-                toggle = page.locator(".toggle-sell, .sell-toggle, label:has-text('SELL')").first
+        print("[DEBUG] Step 6: Looking for SELL toggle...")
+        # CORRECT SELECTOR from browser exploration: .order__options--sell
+        toggle_selectors = [
+            ".order__options--sell",     # Primary selector found from browser exploration
+            "text=SELL",                 # Fallback text selector
+            "span:text('SELL')",
+            "[class*='options--sell']",  # Partial class match
+        ]
+        
+        toggle_clicked = False
+        for sel in toggle_selectors:
+            try:
+                toggle = page.locator(sel).first
                 if await toggle.is_visible():
                     await toggle.click()
-                    print("[DEBUG] Clicked SELL toggle (fallback)")
-        except Exception as e:
-            print(f"[DEBUG] Toggle click attempt: {e}")
+                    toggle_clicked = True
+                    print(f"[DEBUG] SELL toggle clicked using selector: {sel}")
+                    break
+            except:
+                pass
+        
+        if not toggle_clicked:
+            print("[DEBUG] WARNING: Could not find SELL toggle!")
         
         await page.wait_for_timeout(300)
         
         # 7. Click Submit (Sell Button)
-        print("[DEBUG] Clicking Sell Button...")
-        submit_btn = page.locator("button[type='submit'], button.btn-primary, button.btn-danger, button.btn-success").first
-        await submit_btn.click()
-        print("[DEBUG] Clicked Submit.")
+        print("[DEBUG] Step 7: Looking for Submit button...")
+        submit_selectors = [
+            "button.btn-sm:not(.btn-default)",   # Primary: small button that's not cancel
+            "button:has-text('SELL')",           # Button with SELL text
+            "button[type='submit']",             # Standard submit
+        ]
+        
+        submit_clicked = False
+        for sel in submit_selectors:
+            try:
+                btn = page.locator(sel).first
+                if await btn.is_visible():
+                    btn_text = await btn.text_content()
+                    print(f"[DEBUG] Found submit button: '{btn_text}'")
+                    await btn.click()
+                    submit_clicked = True
+                    print(f"[DEBUG] Submit clicked using: {sel}")
+                    break
+            except Exception as e:
+                print(f"[DEBUG] Selector '{sel}' failed: {e}")
+        
+        if not submit_clicked:
+            print("[DEBUG] ERROR: Could not click any submit button!")
+        else:
+            print("[DEBUG] Submit button CLICKED successfully.")
         
         # 7. Check for Errors/Success (Toast Messages & Popups)
         await page.wait_for_timeout(2500)
