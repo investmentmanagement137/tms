@@ -277,6 +277,12 @@ async def main():
                 await Actor.set_value('OUTPUT', final_output)
                 await Actor.push_data(final_output)
                 
+                # Log Download Link
+                kv_store_id = os.environ.get('APIFY_DEFAULT_KEY_VALUE_STORE_ID')
+                if kv_store_id:
+                    public_url = f"https://api.apify.com/v2/key-value-stores/{kv_store_id}/records/OUTPUT?disableRedirect=true"
+                    Actor.log.info(f"💾 Output Download Link: {public_url}")
+                
                 Actor.log.info('✅ Workflow Completed Successfully!')
                 await Actor.exit() # Explicitly exit with success code 0
                 
