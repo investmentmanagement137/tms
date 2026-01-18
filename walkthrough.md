@@ -49,6 +49,13 @@ After fixing the session verification, a secondary issue was found where the bot
 Analyzed `order_entry_dump.html` and found two tables: one for headers (in `.k-grid-header`) and one for data (in `.k-grid-content`).
 - **Fix:** Update `src/buy_stock.py` to use specific selector `.k-grid-content tbody tr` to target only the data rows, avoiding the header table. Added explicit wait for this selector.
 
+### Dashboard Optimization (Implemented)
+- **Goal:** Extract dashboard data immediately after login (from "homepage") to avoid redundant navigation at the end of the script.
+- **Changes:**
+    - Modified `src/dashboard.py` to skip `page.goto` if `page.url` already contains "dashboard".
+    - Updated `main.py` to call `extract_dashboard_data` immediately after session verification/login (Pre-Trade).
+    - Removed the post-trade dashboard extraction block.
+
 ## Verification
 Created a script `verify_dashboard_extraction_local.py` that:
 1. Loads the provided `dashboard_dump.html`.

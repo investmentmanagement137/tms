@@ -151,22 +151,21 @@ async def main():
                     "timestamp": str(datetime.datetime.now()),
                     "batch_results": []
                 }
-
-                # 6. Extract Dashboard Data (Collateral, Limits)
-                # We are logged in now (either via session or fresh login)
-                Actor.log.info("Extracting Dashboard Data...")
+                
+                # --- OPTIMIZATION START ---
+                # Extract Dashboard Data immediately while we are on the homepage
+                # This saves a navigation step later.
+                Actor.log.info("Extracting Dashboard Data (Pre-Trade)...")
                 try:
-                    # extract_dashboard_data runs on current page
+                    # extract_dashboard_data runs on current page (skips nav if already there)
                     dash_data = await dashboard.extract_dashboard_data(page, tms_url)
                     
                     # VALIDATION: Check if data is empty or missing key fields
                     if not dash_data or not dash_data.get('tradeSummary'):
                         Actor.log.warning("Dashboard data is empty or incomplete! Saving debug info...")
-                        # Dump HTML
                         try:
                             html = await page.content()
                             await Actor.set_value('dashboard_fail_dump.html', html, content_type='text/html')
-                            # Screenshot
                             screenshot = await page.screenshot(full_page=True)
                             await Actor.set_value('dashboard_fail.png', screenshot, content_type='image/png')
                             Actor.log.info("Saved dashboard_fail_dump.html and dashboard_fail.png to Key-Value Store.")
@@ -184,6 +183,11 @@ async def main():
                          await Actor.set_value('dashboard_error.png', await page.screenshot(full_page=True), content_type='image/png')
                      except: 
                          pass
+                # --- OPTIMIZATION END ---
+
+                # 6. Extract Dashboard Data (Moved to Start)
+                # Code removed here as it is processed before order entry now.
+
 
                 # Check for Batch Orders / BATCH action
                 batch_orders = actor_input.get('orders', [])

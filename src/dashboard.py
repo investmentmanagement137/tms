@@ -9,13 +9,17 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
     # Navigate to the Desktop dashboard (client/) as we have optimized selectors for it
     # main.py now guarantees a valid session before calling this
     dashboard_url = f"{tms_url.rstrip('/')}/tms/client/dashboard"
-    print(f"[DEBUG] Navigating to Dashboard: {dashboard_url}")
     
-    try:
-        await page.goto(dashboard_url, wait_until='networkidle', timeout=30000)
-    except Exception as e:
-        print(f"[DEBUG] Navigation failed: {e}")
-        return {}
+    # Optimization: If we are already on the dashboard, skip navigation
+    if "dashboard" in page.url and "/tms/" in page.url:
+         print(f"[DEBUG] Already on Dashboard ({page.url}), skipping navigation.")
+    else:
+         print(f"[DEBUG] Navigating to Dashboard: {dashboard_url}")
+         try:
+             await page.goto(dashboard_url, wait_until='networkidle', timeout=30000)
+         except Exception as e:
+             print(f"[DEBUG] Navigation failed: {e}")
+             return {}
 
     try:
         # Wait for "Loading..." overlay to go away if it exists
