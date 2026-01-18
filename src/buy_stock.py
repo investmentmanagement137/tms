@@ -193,12 +193,28 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         print("[DEBUG] Refreshing On-Page Order Book...")
         try:
             # 1. Click Refresh Button to get latest data
-            # Verified: refresh icon is in the Order Book header
-            refresh_btn = page.locator(".nf-refresh, i.nf-refresh, span:has(.nf-refresh)").last
-            if await refresh_btn.is_visible():
-                await refresh_btn.click()
+            # VERIFIED SELECTOR: #kendo__refresh (Kendo Grid refresh icon)
+            refresh_selectors = [
+                "#kendo__refresh",           # Primary: Kendo Grid refresh ID
+                ".k-i-refresh",              # Kendo refresh icon class
+                "span[title='Reload table']", # By title attribute
+                ".nf-refresh",               # Fallback
+            ]
+            
+            refresh_clicked = False
+            for sel in refresh_selectors:
+                try:
+                    refresh_btn = page.locator(sel).first
+                    if await refresh_btn.is_visible():
+                        await refresh_btn.click()
+                        refresh_clicked = True
+                        print(f"[DEBUG] Order Book refreshed using: {sel}")
+                        break
+                except:
+                    pass
+            
+            if refresh_clicked:
                 await page.wait_for_timeout(2000)  # Wait for data reload
-                print("[DEBUG] Order Book refreshed")
             else:
                 print("[DEBUG] Refresh button not found, using current state")
 
