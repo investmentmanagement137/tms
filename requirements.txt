@@ -1,6 +1,5 @@
-apify>=2.0.0
-selenium>=4.0.0
-webdriver-manager>=4.0.0
+apify>=1.0.0
+playwright
 google-generativeai>=0.3.0
 Pillow>=9.0.0
 

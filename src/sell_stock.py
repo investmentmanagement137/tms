@@ -1,9 +1,8 @@
-from selenium.webdriver.common.by import By
-import time
+import asyncio
 
-def execute(driver, tms_url, symbol, quantity, price):
+async def execute(page, tms_url, symbol, quantity, price):
     """
-    Places a SELL order.
+    Places a SELL order using Playwright.
     Returns result dictionary.
     """
     print(f"\n[DEBUG] Placing SELL Order: {symbol}, Qty: {quantity}, Price: {price}")
@@ -13,8 +12,7 @@ def execute(driver, tms_url, symbol, quantity, price):
     order_url = f"{base_url}/tms/n/order/order-entry"
     
     print(f"[DEBUG] Navigating to Order Entry: {order_url}")
-    driver.get(order_url)
-    time.sleep(3)
+    await page.goto(order_url, wait_until='networkidle')
     
     result = {
         "status": "FAILED",
@@ -31,64 +29,49 @@ def execute(driver, tms_url, symbol, quantity, price):
     try:
         # 1. Select Sell Tab
         try:
-            # Try finding a tab/button with text "Sell"
-            sell_tab = driver.find_element(By.XPATH, "//a[contains(text(), 'Sell')] | //button[contains(text(), 'Sell')]")
-            sell_tab.click()
+            sell_tab = page.locator("xpath=//a[contains(text(), 'Sell')] | //button[contains(text(), 'Sell')]").first
+            if await sell_tab.is_visible():
+                await sell_tab.click()
+            else:
+                 await page.click(".btn-sell, .sell-tab, input[value='2']")
         except:
-            # Fallback to probable class names
-            driver.execute_script("document.querySelector('.btn-sell, .sell-tab, input[value=\"2\"]').click()") # value=2 is common for Sell in some forms
+             print("[DEBUG] Sell tab selection exception (ignoring)")
+
         print("[DEBUG] Selected SELL tab")
-        time.sleep(1)
 
         # 2. Enter Symbol
         print(f"[DEBUG] Entering Symbol: {symbol}")
-        sym_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Symbol'], input[name='symbol']")
-        sym_input.clear()
-        sym_input.send_keys(symbol)
-        time.sleep(1)
-        # Trigger autocomplete
-        from selenium.webdriver.common.keys import Keys
-        sym_input.send_keys(Keys.TAB)
-        time.sleep(1)
+        await page.fill("input[placeholder='Symbol'], input[name='symbol']", symbol)
+        await page.keyboard.press("Tab") # Trigger autocomplete
+        await page.wait_for_timeout(1000)
 
         # 3. Enter Quantity
         print(f"[DEBUG] Entering Quantity: {quantity}")
-        qty_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Qty'], input[name='quantity']")
-        qty_input.clear()
-        qty_input.send_keys(str(quantity))
+        await page.fill("input[placeholder='Qty'], input[name='quantity']", str(quantity))
 
         # 4. Enter Price
         print(f"[DEBUG] Entering Price: {price}")
-        price_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Price'], input[name='price']")
-        price_input.clear()
-        price_input.send_keys(str(price))
+        await page.fill("input[placeholder='Price'], input[name='price']", str(price))
         
-        time.sleep(1)
+        await page.wait_for_timeout(500)
         
-        # 5. Click Submit (Sell Button might be Red/Distinct)
+        # 5. Click Submit (Sell Button)
         print("[DEBUG] Clicking Sell Button...")
-        submit_btn = driver.find_element(By.CSS_SELECTOR, "button[type='submit'], button.btn-primary, button.btn-danger, button.btn-success")
-        # Note: Sell buttons are often 'btn-danger' or red.
-        
-        if "Place Order" in submit_btn.text or "Sell" in submit_btn.text:
-            submit_btn.click()
-            print("[DEBUG] Clicked Submit.")
-        else:
-             print("[DEBUG] Warning: Submit button text mismatch? Clicking anyway.")
-             submit_btn.click()
+        submit_btn = page.locator("button[type='submit'], button.btn-primary, button.btn-danger, button.btn-success").first
+        await submit_btn.click()
+        print("[DEBUG] Clicked Submit.")
         
         # 6. Check for Errors/Success
-        time.sleep(2)
+        await page.wait_for_timeout(2000)
         
-        # Check for error toast
         error_msg = ""
-        try:
-            toasts = driver.find_elements(By.CSS_SELECTOR, ".toast-message, .alert-danger")
-            for t in toasts:
-                if t.is_displayed():
-                    error_msg += t.text + " "
-        except:
-            pass
+        toasts = page.locator(".toast-message, .alert-danger")
+        count = await toasts.count()
+        if count > 0:
+            for i in range(count):
+                if await toasts.nth(i).is_visible():
+                    txt = await toasts.nth(i).text_content()
+                    error_msg += txt + " "
             
         if error_msg:
             print(f"[DEBUG] Order Error: {error_msg}")
