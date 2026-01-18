@@ -3,10 +3,13 @@ import io
 import time
 import asyncio
 from PIL import Image
-import google.generativeai as genai
+import asyncio
+from PIL import Image
+from google import genai
+from google.genai import types
 
 async def solve_captcha(page, api_key):
-    """Solves captcha using Gemini API (Async Playwright)."""
+    """Solves captcha using Gemini API (new google-genai SDK)."""
     try:
         print("Attempting to solve captcha using Gemini API...")
         
@@ -20,26 +23,35 @@ async def solve_captcha(page, api_key):
             return None
         
         print("Capturing captcha screenshot...")
-        # Screenshot directly to memory bytes?
-        # Playwright screenshot returns bytes
         screenshot_bytes = await captcha_loc.screenshot()
         image = Image.open(io.BytesIO(screenshot_bytes))
         
         print("Sending to Gemini API...")
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        # Client initialization
+        client = genai.Client(api_key=api_key)
         
-        # We need to run sync Gemini call in executor if we want strict async, 
-        # but for this script blocking briefly is fine or we can use to_thread.
+        # We run this in a thread executor because the new SDK might still be sync-heavy or we just want to be safe
         loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, lambda: model.generate_content([
-            "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.", 
-            image
-        ]))
         
-        captcha_text = response.text.strip()
-        print(f"Gemini solved captcha: '{captcha_text}'")
-        return captcha_text
+        def generate():
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[
+                    "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.",
+                    image
+                ]
+            )
+            return response.text
+
+        captcha_text = await loop.run_in_executor(None, generate)
+        
+        if captcha_text:
+            captcha_text = captcha_text.strip()
+            print(f"Gemini solved captcha: '{captcha_text}'")
+            return captcha_text
+        else:
+             print("Gemini returned empty text.")
+             return None
         
     except Exception as e:
         print(f"Error solving captcha: {e}")

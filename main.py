@@ -216,6 +216,7 @@ async def main():
                 await Actor.push_data(final_output)
                 
                 Actor.log.info('✅ Workflow Completed Successfully!')
+                await Actor.exit() # Explicitly exit with success code 0
                 
             except Exception as e:
                 Actor.log.error(f'Error during execution: {e}')
