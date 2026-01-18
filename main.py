@@ -14,6 +14,27 @@ from webdriver_manager.chrome import ChromeDriverManager
 from src import utils, login, buy_stock, sell_stock, daily_history
 
 
+
+import time # Ensure time is imported
+
+async def main():
+    async with Actor:
+        # Get input from Apify
+        actor_input = await Actor.get_input() or {}
+        
+        # Extract inputs
+        tms_username = actor_input.get('tmsUsername')
+        tms_password = actor_input.get('tmsPassword')
+        gemini_api_key = actor_input.get('geminiApiKey')
+        tms_url = actor_input.get('tmsUrl')
+        
+        # Sanitize tmsUrl to remove trailing /login or /
+        if tms_url:
+            tms_url = tms_url.strip().rstrip('/')
+            if tms_url.endswith('/login'):
+                tms_url = tms_url[:-6] # Remove /login
+            tms_url = tms_url.rstrip('/') # Clean again
+
         action = actor_input.get('action', 'BATCH') # Default to safer option
         
         # Validate Credentials
