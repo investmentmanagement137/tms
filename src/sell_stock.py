@@ -27,61 +27,75 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     }
     
     try:
-        # === VERIFIED SELECTORS FROM BROWSER EXPLORATION ===
-        # 1. Click SELL toggle FIRST (required - form won't work in neutral state)
-        print("[DEBUG] Step 1: Clicking SELL toggle...")
+        # === CORRECT ORDER: Instrument -> Toggle -> Form Fields ===
+        
+        # 1. Select Instrument Type FIRST
+        print(f"[DEBUG] Step 1: Selecting Instrument: {instrument}")
+        try:
+            inst_select = page.locator("select.form-inst, select[formcontrolname='instType']").first
+            if await inst_select.is_visible():
+                await inst_select.select_option(label=instrument)
+                print(f"[DEBUG] Instrument selected: {instrument}")
+            else:
+                print("[DEBUG] WARNING: Instrument dropdown not visible!")
+        except Exception as inst_err:
+            print(f"[DEBUG] Instrument selection failed: {inst_err}")
+        
+        await page.wait_for_timeout(300)
+
+        # 2. Click SELL toggle
+        print("[DEBUG] Step 2: Clicking SELL toggle...")
         sell_toggle = page.locator(".order__options--sell")
         if await sell_toggle.is_visible():
             await sell_toggle.click()
-            print("[DEBUG] SELL toggle clicked via .order__options--sell")
+            print("[DEBUG] SELL toggle clicked")
         else:
             await page.locator("text=SELL").first.click()
             print("[DEBUG] SELL toggle clicked via text=SELL")
         
         await page.wait_for_timeout(300)
         
-        # 2. Select Instrument Type
-        print(f"[DEBUG] Step 2: Selecting Instrument: {instrument}")
-        try:
-            inst_select = page.locator("select.form-inst")
-            if await inst_select.is_visible():
-                await inst_select.select_option(label=instrument)
-                print(f"[DEBUG] Instrument selected: {instrument}")
-            else:
-                await page.select_option("select[formcontrolname='instType']", label=instrument)
-        except Exception as inst_err:
-            print(f"[DEBUG] Instrument selection failed: {inst_err}")
-        
-        await page.wait_for_timeout(300)
-        
-        # 3. Enter Symbol
+        # 3. Enter Symbol (CRITICAL: Must click from typeahead dropdown!)
         print(f"[DEBUG] Step 3: Entering Symbol: {symbol}")
-        # FIX: input.form-control.form-control-sm was matching disabled Client Name!
-        symbol_selectors = [
-            "input[formcontrolname='symbol']",
-            "input[ng-reflect-name='symbol']",
-            "input[placeholder*='Symbol']",
-        ]
         
-        symbol_filled = False
-        for sel in symbol_selectors:
-            try:
-                symbol_input = page.locator(sel).first
-                if await symbol_input.is_visible():
-                    await symbol_input.click()
-                    await symbol_input.fill(symbol)
-                    symbol_filled = True
-                    print(f"[DEBUG] Symbol filled using: {sel}")
-                    break
-            except:
-                pass
+        symbol_input = page.locator("input[formcontrolname='symbol']").first
         
-        if not symbol_filled:
-            print("[DEBUG] WARNING: Could not fill symbol field!")
+        if await symbol_input.is_visible():
+            await symbol_input.click()
+            await symbol_input.fill("")
+            await symbol_input.type(symbol, delay=100)
+            print(f"[DEBUG] Symbol typed: {symbol}")
+            
+            await page.wait_for_timeout(1500)
+            
+            dropdown_selectors = [
+                f".dropdown-menu li a:has-text('{symbol}')",
+                ".dropdown-menu li a",
+                ".typeahead-item",
+                f"li:has-text('{symbol}') a",
+            ]
+            
+            dropdown_clicked = False
+            for sel in dropdown_selectors:
+                try:
+                    dropdown_item = page.locator(sel).first
+                    if await dropdown_item.is_visible(timeout=1000):
+                        await dropdown_item.click()
+                        dropdown_clicked = True
+                        print(f"[DEBUG] Symbol selected from dropdown using: {sel}")
+                        break
+                except:
+                    pass
+            
+            if not dropdown_clicked:
+                print("[DEBUG] Dropdown not found, using Tab+Enter fallback")
+                await page.keyboard.press("Tab")
+                await page.wait_for_timeout(500)
+                await page.keyboard.press("Enter")
+        else:
+             print("[DEBUG] WARNING: Symbol input not visible!")
         
-        await page.keyboard.press("Tab")
-        await page.wait_for_timeout(1500)
-        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(500)
         print("[DEBUG] Symbol entry complete")
         
         await page.wait_for_timeout(500)
@@ -108,30 +122,41 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         # 6. Click Submit Button
         print("[DEBUG] Step 6: Looking for Submit button...")
-        submit_selectors = [
-            "button.btn-sm:not(.btn-default)",   # Primary: small button that's not cancel
-            "button:has-text('SELL')",           # Button with SELL text
-            "button[type='submit']",             # Standard submit
-        ]
+        # Submit button is the button before CANCEL button (.btn-default.btn-sm)
+        # It should say "SELL" and be enabled
+        submit_btn = page.locator("button.btn-sm:not(.btn-default), button.btn-primary:has-text('SELL')").first
+        
+        # Wait a moment for button state to update
+        await page.wait_for_timeout(500)
         
         submit_clicked = False
-        for sel in submit_selectors:
-            try:
-                btn = page.locator(sel).first
-                if await btn.is_visible():
-                    btn_text = await btn.text_content()
-                    print(f"[DEBUG] Found submit button: '{btn_text}'")
-                    await btn.click()
+        if await submit_btn.is_visible():
+            btn_text = (await submit_btn.text_content()).strip()
+            is_disabled = await submit_btn.is_disabled()
+            
+            print(f"[DEBUG] Found submit button: Text='{btn_text}', Disabled={is_disabled}")
+            
+            if not is_disabled and "SELL" in btn_text.upper():
+                await submit_btn.click()
+                print("[DEBUG] Submit button clicked")
+                submit_clicked = True
+            else:
+                print(f"[DEBUG] Submit button is not ready (Text: {btn_text}, Disabled: {is_disabled})")
+                
+                # Try to force update by focusing fields
+                print("[DEBUG] Attempting to refresh form state...")
+                await page.locator("input[formcontrolname='price']").first.click()
+                await page.keyboard.press("Tab")
+                await page.wait_for_timeout(500)
+                
+                # Check again
+                if not await submit_btn.is_disabled():
+                    await submit_btn.click()
+                    print("[DEBUG] Submit button clicked after refresh")
                     submit_clicked = True
-                    print(f"[DEBUG] Submit clicked using: {sel}")
-                    break
-            except Exception as e:
-                print(f"[DEBUG] Selector '{sel}' failed: {e}")
-        
-        if not submit_clicked:
-            print("[DEBUG] ERROR: Could not click any submit button!")
         else:
-            print("[DEBUG] Submit button CLICKED successfully.")
+             print("[DEBUG] Submit button not found")
+             submit_clicked = False
         
         # 7. Check for Errors/Success (Toast Messages & Popups)
         await page.wait_for_timeout(2500)

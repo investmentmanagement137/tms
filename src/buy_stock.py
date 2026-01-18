@@ -143,26 +143,39 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         # 6. Click Submit Button
         print("[DEBUG] Step 6: Looking for Submit button...")
         # Submit button is the button before CANCEL button (.btn-default.btn-sm)
-        submit_selectors = [
-            "button.btn-sm:not(.btn-default)",    # Primary: small button that's not cancel
-            "button.btn-primary.btn-sm",          # Primary button small 
-            "button:has-text('BUY')",             # Button with BUY text
-            "button[type='submit']",              # Standard submit
-        ]
+        # It should say "BUY" and be enabled
+        submit_btn = page.locator("button.btn-sm:not(.btn-default), button.btn-primary:has-text('BUY')").first
         
-        submit_clicked = False
-        for sel in submit_selectors:
-            try:
-                btn = page.locator(sel).first
-                if await btn.is_visible():
-                    btn_text = await btn.text_content()
-                    print(f"[DEBUG] Found submit button with selector '{sel}', text: '{btn_text}'")
-                    await btn.click()
+        # Wait a moment for button state to update
+        await page.wait_for_timeout(500)
+        
+        submit_clicked = False # Initialize submit_clicked here
+        if await submit_btn.is_visible():
+            btn_text = (await submit_btn.text_content()).strip()
+            is_disabled = await submit_btn.is_disabled()
+            
+            print(f"[DEBUG] Found submit button: Text='{btn_text}', Disabled={is_disabled}")
+            
+            if not is_disabled and "BUY" in btn_text.upper():
+                await submit_btn.click()
+                print("[DEBUG] Submit button clicked")
+                submit_clicked = True
+            else:
+                print(f"[DEBUG] Submit button is not ready (Text: {btn_text}, Disabled: {is_disabled})")
+                # Try to force update by focusing fields
+                print("[DEBUG] Attempting to refresh form state...")
+                await page.locator("input[formcontrolname='price']").first.click()
+                await page.keyboard.press("Tab")
+                await page.wait_for_timeout(500)
+                
+                # Check again
+                if not await submit_btn.is_disabled():
+                    await submit_btn.click()
+                    print("[DEBUG] Submit button clicked after refresh")
                     submit_clicked = True
-                    print(f"[DEBUG] Submit button clicked using selector: {sel}")
-                    break
-            except Exception as e:
-                print(f"[DEBUG] Selector '{sel}' failed: {e}")
+        else:
+             print("[DEBUG] Submit button not found")
+             submit_clicked = False
         
         if not submit_clicked:
             print("[DEBUG] ERROR: Could not click any submit button!")
