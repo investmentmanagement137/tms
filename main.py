@@ -94,7 +94,12 @@ async def main():
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         # --- Versioning ---
-        VERSION = "1.1.0"
+        try:
+            with open('VERSION', 'r') as vf:
+                VERSION = vf.read().strip()
+        except:
+            VERSION = "1.1.0"
+            
         Actor.log.info(f"TMS Actor Version: {VERSION}")
         
         try:
