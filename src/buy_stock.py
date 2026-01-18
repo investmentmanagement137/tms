@@ -122,47 +122,82 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         print("[DEBUG] Step 6: Looking for Submit button...")
         await page.wait_for_timeout(500)  # Wait for form validation
         
-        # Check submit button state
-        btn_info = await page.evaluate("""() => {
-            const btn = document.querySelector('button.btn-sm:not(.btn-default), button.btn-primary');
-            if (btn) {
-                return {
-                    text: btn.innerText.trim(),
-                    disabled: btn.disabled,
-                    className: btn.className
-                };
-            }
-            return null;
-        }""")
+        # Find and click the submit button more robustly
+        submit_clicked = False
         
-        print(f"[DEBUG] Submit button state: {btn_info}")
+        # Try multiple selectors for submit button
+        submit_selectors = [
+            "button.btn-primary.btn-lg",  # Main submit button
+            "button.btn-sm.btn-primary:not(.btn-default)",
+            "button[type='submit'].btn-primary",
+            "button:has-text('BUY')",
+            "button.btn-primary:visible"
+        ]
         
-        if btn_info and "BUY" in btn_info.get("text", "").upper() and not btn_info.get("disabled"):
-            submit_btn = page.locator("button.btn-sm:not(.btn-default), button.btn-primary:has-text('BUY')").first
-            await submit_btn.click()
-            print("[DEBUG] Submit button clicked!")
-            submit_clicked = True
-        else:
-            print("[DEBUG] Submit button not ready, trying force click...")
-            # Force click via JS
+        for selector in submit_selectors:
+            try:
+                btn = page.locator(selector).first
+                if await btn.count() > 0 and await btn.is_visible():
+                    await btn.click()
+                    print(f"[DEBUG] Clicked submit button with selector: {selector}")
+                    submit_clicked = True
+                    break
+            except:
+                continue
+        
+        if not submit_clicked:
+            print("[DEBUG] Submit button not found via locators, trying JS force click...")
             await page.evaluate("""() => {
-                const btn = document.querySelector('button.btn-sm:not(.btn-default)');
-                if (btn) btn.click();
+                const btns = document.querySelectorAll('button.btn-primary, button.btn-sm');
+                for (const btn of btns) {
+                    if (!btn.disabled && btn.offsetParent !== null) {
+                        btn.click();
+                        console.log('Force clicked:', btn.className);
+                        return true;
+                    }
+                }
+                return false;
             }""")
             submit_clicked = True
         
-        # === STEP 7: Capture Result ===
-        await page.wait_for_timeout(2500)
+        # === STEP 7: Handle Confirmation Dialog (SweetAlert) ===
+        print("[DEBUG] Step 7: Checking for confirmation dialog...")
+        await page.wait_for_timeout(1500)
+        
+        # TMS uses SweetAlert for confirmations - look for confirm button
+        confirm_selectors = [
+            ".swal2-confirm",  # SweetAlert confirm button
+            "button.swal2-confirm",
+            ".swal2-actions button.swal2-confirm",
+            "button:has-text('OK')",
+            "button:has-text('Confirm')",
+            "button:has-text('Yes')"
+        ]
+        
+        for selector in confirm_selectors:
+            try:
+                confirm_btn = page.locator(selector).first
+                if await confirm_btn.count() > 0 and await confirm_btn.is_visible():
+                    await confirm_btn.click()
+                    print(f"[DEBUG] Clicked confirmation button: {selector}")
+                    await page.wait_for_timeout(1000)
+                    break
+            except:
+                continue
+        
+        # === STEP 8: Capture Result ===
+        await page.wait_for_timeout(2000)
         
         # Check for popup/toast messages
         popup_msg = ""
         popup_selectors = [
+            ".swal2-title",  # SweetAlert title (success/error)
+            ".swal2-html-container",  # SweetAlert message
             ".toast-container .toast-message",
             ".toast-message",
             ".toast-body",
             ".alert-danger",
             ".alert-success",
-            ".swal2-title",
         ]
         
         for selector in popup_selectors:

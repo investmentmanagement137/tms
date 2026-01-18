@@ -74,7 +74,8 @@ async def perform_login(page, username, password, api_key, tms_url):
     for attempt in range(1, max_retries + 1):
         print(f"\n--- Login Attempt {attempt}/{max_retries} ---")
         try:
-             await page.goto(login_url, wait_until='networkidle')
+             # Use domcontentloaded instead of networkidle for faster, more reliable loads
+             await page.goto(login_url, wait_until='domcontentloaded', timeout=30000)
              title = await page.title()
              print(f"[DEBUG] Navigation successful. Page title: {title}")
              
