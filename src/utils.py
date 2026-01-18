@@ -197,10 +197,16 @@ async def perform_login(page, username, password, api_key, tms_url):
             print("[LOGIN] Step 5: Solving captcha...")
             captcha_text = await solve_captcha(page, api_key)
             
-            if not captcha_text:
-                print("[LOGIN] ❌ Captcha solving failed")
-                # Refresh to get new captcha
-                await page.reload(wait_until='domcontentloaded', timeout=15000)
+            # Validate Captcha Response
+            if not captcha_text or len(captcha_text) > 8 or "unable" in captcha_text.lower() or " " in captcha_text:
+                print(f"[LOGIN] ❌ Invalid captcha solution: '{captcha_text}' (Length: {len(captcha_text) if captcha_text else 0})")
+                
+                # Logic to retry immediately? Or just fail attempt and reload page
+                # Refresh to get new captcha is best
+                print("[LOGIN] Reloading page to get fresh captcha...")
+                try:
+                    await page.reload(wait_until='domcontentloaded', timeout=20000)
+                except: pass
                 continue
             
             # Fill captcha input
