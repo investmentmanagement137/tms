@@ -120,13 +120,17 @@ async def main():
                 "batch_results": []
             }
 
-            # Check for Batch Orders
+            # Check for Batch Orders / BATCH action
             batch_orders = actor_input.get('orders', [])
             check_orders_flag = actor_input.get('checkOrders', True)
             
             executed_any_order = False
 
-            if batch_orders and isinstance(batch_orders, list) and len(batch_orders) > 0:
+            if (action == 'BATCH' or (batch_orders and len(batch_orders) > 0)):
+                if not batch_orders:
+                    await Actor.fail('Action is BATCH but "orders" list is empty!')
+                    return
+
                 Actor.log.info(f"Processing Batch of {len(batch_orders)} orders...")
                 
                 for order in batch_orders:

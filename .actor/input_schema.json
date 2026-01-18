@@ -40,43 +40,46 @@
             "enum": [
                 "BUY",
                 "SELL",
+                "BATCH",
                 "CHECK_ORDERS"
             ]
         },
         "symbol": {
             "title": "Stock Symbol (Single Mode)",
             "type": "string",
-            "description": "The stock symbol to trade (For Single Order Mode)",
-            "editor": "textfield"
+            "description": "Stock Symbol (Required for BUY/SELL actions)",
+            "editor": "textfield",
+            "sectionCaption": "Single Order Details"
         },
         "buyPrice": {
-            "title": "Buy Price (Single Mode)",
+            "title": "Buy Price",
             "type": "integer",
-            "description": "Price per unit (For Single Order Mode)",
+            "description": "Price per unit",
             "editor": "number"
         },
         "buyQuantity": {
-            "title": "Buy Quantity (Single Mode)",
+            "title": "Buy Quantity",
             "type": "integer",
-            "description": "Number of units (For Single Order Mode)",
+            "description": "Number of units",
             "editor": "number"
         },
         "sellPrice": {
             "title": "Sell Price",
             "type": "integer",
-            "description": "Price per unit to sell at",
+            "description": "Price per unit",
             "editor": "number"
         },
         "sellQuantity": {
             "title": "Sell Quantity",
             "type": "integer",
-            "description": "Number of units to sell",
+            "description": "Number of units",
             "editor": "number"
         },
         "orders": {
-            "title": "Batch Orders",
+            "title": "Batch Orders List",
             "type": "array",
-            "description": "List of orders to execute in batch. Example: [{'symbol':'NICA', 'qty':10, 'price':400, 'side':'BUY'}]",
+            "description": "List of orders to execute in BATCH mode.",
+            "sectionCaption": "Batch Mode Configuration",
             "editor": "json",
             "items": {
                 "type": "object",
