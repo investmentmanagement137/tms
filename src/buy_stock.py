@@ -1,5 +1,6 @@
 import asyncio
 from urllib.parse import urlencode
+from .toast_capture import capture_all_popups, wait_for_toast, is_error_message
 
 async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     """
@@ -230,33 +231,13 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         # === STEP 8: Capture Result ===
         await page.wait_for_timeout(2000)
         
-        # Check for popup/toast messages
-        popup_msg = ""
-        popup_selectors = [
-            ".swal2-title",  # SweetAlert title (success/error)
-            ".swal2-html-container",  # SweetAlert message
-            ".toast-container .toast-message",
-            ".toast-message",
-            ".toast-body",
-            ".alert-danger",
-            ".alert-success",
-        ]
-        
-        for selector in popup_selectors:
-            popups = page.locator(selector)
-            count = await popups.count()
-            for i in range(count):
-                if await popups.nth(i).is_visible():
-                    txt = await popups.nth(i).text_content()
-                    if txt and txt.strip():
-                        popup_msg += txt.strip() + " "
-        
-        popup_msg = popup_msg.strip()
-        print(f"[DEBUG] Popup message: {popup_msg}")
+        # Check for popup/toast messages using toast_capture module
+        popup_msg = await capture_all_popups(page)
+        print(f"[DEBUG] Toast/Popup message: {popup_msg}")
         
         if popup_msg:
             result["popupMessage"] = popup_msg
-            if any(err in popup_msg.lower() for err in ["error", "failed", "invalid", "rejected"]):
+            if is_error_message(popup_msg):
                 result["status"] = "ERROR"
                 result["message"] = popup_msg
             else:

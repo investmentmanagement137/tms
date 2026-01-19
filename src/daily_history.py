@@ -1,5 +1,6 @@
 import asyncio
 from bs4 import BeautifulSoup
+from .toast_capture import log_toasts, capture_all_popups
 
 async def extract(page, tms_url):
     """
@@ -62,5 +63,9 @@ async def extract(page, tms_url):
                     
     except Exception as e:
         print(f"[DEBUG] Error extracting order book: {e}")
+    
+    # Log any toast messages that appeared during extraction
+    print("[DEBUG] Checking for any toast messages on order book page...")
+    await log_toasts(page, prefix="[ORDER_BOOK][TOAST]")
         
     return orders

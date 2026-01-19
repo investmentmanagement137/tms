@@ -12,17 +12,17 @@
                 "useApifyProxy": true
             }
         },
-        "tmsWebsiteUrl": {
+        "tmsUrl": {
             "title": "TMS Website URL",
             "type": "string",
             "description": "The full URL of your TMS login page (e.g., https://tms49.nepsetms.com.np/login).",
             "editor": "textfield",
             "default": "https://tms58.nepsetms.com.np/login"
         },
-        "tmsLoginId": {
-            "title": "TMS Login ID",
+        "tmsUsername": {
+            "title": "TMS Username/Client Code",
             "type": "string",
-            "description": "Your TMS Client Code / Username.",
+            "description": "Your TMS Client Code or Username.",
             "editor": "textfield"
         },
         "tmsPassword": {
@@ -45,12 +45,13 @@
             "description": "The action to perform.",
             "editor": "select",
             "enum": [
+                "BATCH",
                 "EXTRACT_TRADEBOOK",
                 "BUY",
                 "SELL",
                 "EXTRACT_INFO"
             ],
-            "default": "EXTRACT_TRADEBOOK"
+            "default": "BATCH"
         },
         "historyDurationMonths": {
             "title": "History Duration (Months)",
@@ -61,17 +62,28 @@
             "minimum": 1
         },
         "orderDetails": {
-            "title": "Order Details",
+            "title": "Order Details (JSON)",
             "type": "object",
             "description": "Details for Buy/Sell orders.",
             "editor": "json",
             "default": {}
+        },
+        "checkOrders": {
+            "title": "Verify Orders (Daily History)",
+            "type": "boolean",
+            "description": "If true, extract today's order history after executing trades.",
+            "default": true
+        },
+        "checkDashboard": {
+            "title": "Extract Dashboard (Post-Trade)",
+            "type": "boolean",
+            "description": "If true, extract dashboard data (collateral, limits) after executing trades.",
+            "default": true
         }
     },
     "required": [
-        "tmsLoginId",
+        "tmsUsername",
         "tmsPassword",
-        "geminiApiKey",
-        "action"
+        "geminiApiKey"
     ]
 }

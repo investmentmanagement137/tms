@@ -1,4 +1,5 @@
 from playwright.async_api import Page
+from .toast_capture import log_toasts, capture_all_popups
 
 async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
     """
@@ -149,5 +150,9 @@ async def extract_dashboard_data(page: Page, tms_url: str) -> dict:
         print(f"[DEBUG] Dashboard: Status={data.get('marketStatus')}")
         print(f"[DEBUG] Trade Summary: {data.get('tradeSummary')}")
         print(f"[DEBUG] Collateral: {data.get('collateralSummary')}")
+    
+    # Log any toast messages that appeared during extraction
+    print("[DEBUG] Checking for any toast messages on dashboard...")
+    await log_toasts(page, prefix="[DASHBOARD][TOAST]")
     
     return data

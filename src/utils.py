@@ -7,6 +7,7 @@ import asyncio
 from PIL import Image
 from google import genai
 from google.genai import types
+from .toast_capture import log_toasts, capture_all_popups, is_error_message
 
 async def solve_captcha(page, api_key):
     """Solves captcha using Gemini API (new google-genai SDK)."""
@@ -280,21 +281,17 @@ async def perform_login(page, username, password, api_key, tms_url):
                 
                 print("[LOGIN] Still on login page or failed to load dashboard elements")
                 
-                # Check for error messages
-                error_selectors = ['.toast-message', '.alert-danger', '.error-message', '.swal2-title']
-                for selector in error_selectors:
-                    try:
-                        error_el = page.locator(selector).first
-                        if await error_el.count() > 0 and await error_el.is_visible():
-                            error_text = await error_el.text_content()
-                            print(f"[LOGIN] ⚠️ Error from TMS: {error_text}")
-                            
-                            # Check if it's a captcha error (retry-able)
-                            if error_text and ("captcha" in error_text.lower() or "invalid" in error_text.lower()):
-                                print("[LOGIN] Captcha error - will retry with new captcha")
-                            break
-                    except:
-                        continue
+                # Check for error messages using toast capture
+                print("[LOGIN] Checking for toast/popup messages...")
+                await log_toasts(page, prefix="[LOGIN][TOAST]")
+                
+                error_msg = await capture_all_popups(page)
+                if error_msg:
+                    print(f"[LOGIN] ⚠️ Error from TMS: {error_msg}")
+                    
+                    # Check if it's a captcha error (retry-able)
+                    if "captcha" in error_msg.lower() or "invalid" in error_msg.lower():
+                        print("[LOGIN] Captcha error - will retry with new captcha")
                 
                 # Still on login page - check if login form is still visible
                 if "login" in current_url.lower():

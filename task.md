@@ -52,4 +52,5 @@
   - [x] Implement structured extraction for Fund, Trade, and Collateral summaries
   - [x] Add Market Status detection
   - [x] Fix missing 'Total' values and tooltip noise in extraction
+  - [x] Add robust debug logging and HTML/Screenshot capture on failure
 

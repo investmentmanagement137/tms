@@ -1,65 +1,28 @@
-# Convert TMS Scraper to Apify Actor
-# Apify Actor: TMS Order Execution & Daily Order Scraper
+# Implementation Plan - Debugging Dashboard Extraction
 
-## Goal Description
-Convert the existing scraper into a **Trading Actor**.
-1.  **Execute Buy Order**: Input symbol, price, quantity -> Place Order.
-2.  **Verify**: Extract data from "Today's Order Book" to confirm.
-3.  **Output**: JSON containing order details and the current order book.
+The dashboard data extraction is failing silently or returning empty data in the production environment, despite working with local static dumps. This plan aims to add robustness and detailed debugging information to identify the root cause.
 
 ## User Review Required
-> [!IMPORTANT]
-> **Trading Risk**: This actor will perform REAL TRADES. Ensure inputs are correct.
-> **Validation**: The actor will attempt to click "Buy", but success depends on market status, funds, and TMS validation.
+None. These are debugging and robustness improvements.
 
 ## Proposed Changes
 
-### Configuration
-#### [MODIFY] [.actor/input_schema.json](file:///c:/Users/purib/Downloads/antigravity/APIFy/tms%20captch%20new/.actor/input_schema.json)
-- Add `action` (enum: `BUY`, `CHECK_ORDERS`).
-- fields `symbol`, `buyPrice`, `buyQuantity` are required only if `action` is `BUY`.
+### `src/dashboard.py`
+- [MODIFY] Increase `wait_for_selector` timeout from 10s to 30s to handle slow loading.
+- [MODIFY] Add `try-except` block *inside* the `extract_dashboard_data` function specifically around the `page.evaluate` call to catch JS execution errors.
+- [MODIFY] Add a check to verify if the page URL actually matches the expected dashboard URL before attempting extraction.
 
-### Configuration
-#### [MODIFY] [.actor/input_schema.json](file:///c:/Users/purib/Downloads/antigravity/APIFy/tms%20captch%20new/.actor/input_schema.json)
-- Add `tmsUrl` (string, required, e.g., "https://tms58.nepsetms.com.np").
-
-### Logic
-#### [MODIFY] [src/utils.py](file:///c:/Users/purib/Downloads/antigravity/APIFy/tms%20captch%20new/src/utils.py)
-- Remove `get_tms_number`.
-- `perform_login` now takes `tms_url` directly.
-
-#### [MODIFY] [src/buy_stock.py](file:///c:/Users/purib/Downloads/antigravity/APIFy/tms%20captch%20new/src/buy_stock.py)
-- Accept `tms_url`.
-- Construct order URL using `f"{tms_url}/tms/n/order/order-entry"`.
-
-#### [MODIFY] [src/daily_history.py](file:///c:/Users/purib/Downloads/antigravity/APIFy/tms%20captch%20new/src/daily_history.py)
-- Accept `tms_url`.
-- Construct history URL using `f"{tms_url}/tms/n/order/order-book"`.
-
-#### [MODIFY] [main.py](file:///c:/Users/purib/Downloads/antigravity/APIFy/tms%20captch%20new/main.py)
-- Read `tmsUrl` from input.
-- Pass to login and action scripts.
-
-## Verification Plan
-### Automated Tests
-- dry-run: Using a mocked "Click" (or verifying selectors without clicking) if possible, but user requested full execution.
-- verification: Check output JSON for `todaysOrderPage` list.ble
-- Keep all scraping logic intact
-
----
-
-### Documentation
-
-#### [NEW] [APIFY_README.md](file:///c:/Users/purib/Downloads/antigravity/APIFy/tms%20captch%20new/APIFY_README.md)
-- Instructions for deploying to Apify
-- How to configure inputs and secrets
-- How to schedule runs
-- Debugging tips
+### `main.py` (Root)
+- [MODIFY] In the `Extract Dashboard Data` block:
+  - Add explicit error logging (stack trace).
+  - **Crucial**: If extraction fails (returns empty or raises exception), save the current page HTML (`dashboard_fail_dump.html`) and valid screenshot (`dashboard_fail.png`). This will allow us to see exactly what the bot sees when it fails.
 
 ## Verification Plan
 
-### Manual Verification
-- [x] Local Testing: Test the Actor locally using `apify run` command
-- [x] Apify Platform Deployment: Deploy to Apify and verify it runs successfully
-- [x] Scheduled Run Setup: Configure schedule in Apify Console
-- [x] Output Validation: Verify CSV is generated and uploaded to Supabase S3
+### Automated Verification
+1. **Local Dump Test**: Re-run `verify_dashboard_extraction_local.py` to ensure changes didn't break the logic for the known good dump.
+   - Command: `python verify_dashboard_extraction_local.py`
+
+### Production Verification (User)
+1. The user will run the actor on Apify.
+2. If it fails again, we will now have `dashboard_fail_dump.html` and `dashboard_fail.png` in the Key-Value store (or logs) to inspect.

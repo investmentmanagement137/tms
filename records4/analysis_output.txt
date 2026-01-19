@@ -1,0 +1,128 @@
+HTML Title: NEPSE Online Trading system
+
+==================================================
+BUTTONS ANALYSIS
+==================================================
+
+Found 19 buttons.
+
+--- Button 1 ---
+Classes: ['menu__main--searchbtn']
+Type: submit
+Text: 
+Disabled: None
+
+--- Button 2 ---
+Classes: ['btn', 'btn-primary', 'btn-lg']
+Type: button
+Text: 
+Disabled: None
+
+--- Button 3 ---
+Classes: ['btn', 'btn-lg', 'btn-primary']
+Type: button
+Text: Update
+Disabled: None
+
+--- Button 4 ---
+Classes: ['btn', 'btn-danger', 'btn-lg']
+Type: button
+Text: Close
+Disabled: None
+
+--- Button 5 ---
+Classes: ['btn', 'btn-primary', 'btn-lg']
+Type: button
+Text: 
+Disabled: None
+
+--- Button 6 ---
+Classes: ['btn', 'btn-danger', 'btn-lg']
+Type: button
+Text: Close
+Disabled: None
+
+--- Button 7 ---
+Classes: ['btn', 'btn-primary', 'btn-lg']
+Type: button
+Text: 
+Disabled: None
+
+--- Button 8 ---
+Classes: ['btn', 'btn-primary', 'pull-left', 'btn-fluid']
+Type: button
+Text: Select All
+Disabled: None
+
+--- Button 9 ---
+Classes: ['btn', 'btn-default', 'pull-right', 'btn-fluid']
+Type: button
+Text: Deselect All
+Disabled: 
+
+--- Button 10 ---
+Classes: ['btn', 'btn-primary', 'btn-block', 'btn-fluid', 'point-right']
+Type: button
+Text: 
+Disabled: 
+
+--- Button 11 ---
+Classes: ['btn', 'btn-primary', 'btn-block', 'btn-fluid', 'point-left']
+Type: button
+Text: 
+Disabled: 
+
+--- Button 12 ---
+Classes: ['btn', 'btn-primary', 'pull-left', 'btn-fluid']
+Type: button
+Text: Select All
+Disabled: 
+
+--- Button 13 ---
+Classes: ['btn', 'btn-default', 'pull-right', 'btn-fluid']
+Type: button
+Text: Deselect All
+Disabled: 
+
+--- Button 14 ---
+Classes: ['btn', 'btn-success', 'btn-sm']
+Type: button
+Text: Update
+Disabled: None
+
+--- Button 15 ---
+Classes: ['btn', 'btn-danger', 'btn-sm']
+Type: 
+Text: Cancel
+Disabled: None
+
+--- Button 16 ---
+Classes: ['btn', 'btn-sm']
+Type: submit
+Text: -
+Disabled: 
+
+--- Button 17 ---
+Classes: ['btn', 'btn-default', 'btn-sm']
+Type: submit
+Text: CANCEL
+Disabled: 
+
+--- Button 18 ---
+Classes: ['btn', 'btn-primary', 'btn-lg']
+Type: button
+Text: 
+Disabled: None
+
+--- Button 19 ---
+Classes: ['btn', 'btn-primary', 'btn-sm']
+Type: button
+Text: No
+Disabled: None
+
+==================================================
+ORDER BOOK TABLE
+==================================================
+
+Rows in .k-grid-content tbody tr: 1
+  Row: ['No records available.']
