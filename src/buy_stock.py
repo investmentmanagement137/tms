@@ -64,65 +64,82 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         # === STEP 2: Activate BUY toggle with robust retry ===
         print("[DEBUG] Step 2: Activating BUY toggle...")
-        buy_selector = ".order__options--buy"
         is_buy_active = False
         
-        # Click stratgies to try
-        strategies = ["playwright", "js_click", "js_events"]
+        # Multiple selector strategies - the radio input is hidden, clicks must go to label
+        selectors_and_methods = [
+            ("playwright_label", ".order__options--buy label"),
+            ("playwright_input", "input[value='BUY']"),
+            ("js_label", ".order__options--buy label"),
+            ("js_input", "input[value='BUY']"),
+        ]
         
-        for strategy in strategies:
+        for method_name, selector in selectors_and_methods:
             try:
-                # Check if already active
-                if await page.locator(f"{buy_selector}.active").count() > 0:
+                # Check if already active (parent div gets .active class or form control changes)
+                if await page.locator(".order__options--buy.active").count() > 0:
                     print("[DEBUG] BUY toggle already active!")
                     is_buy_active = True
                     break
+                    
+                # Also check if input is checked
+                is_checked = await page.evaluate("""() => {
+                    const input = document.querySelector('input[value="BUY"]');
+                    return input && input.checked;
+                }""")
+                if is_checked:
+                    print("[DEBUG] BUY input already checked!")
+                    is_buy_active = True
+                    break
                 
-                print(f"[DEBUG] Trying toggle strategy: {strategy}")
+                print(f"[DEBUG] Trying toggle: {method_name} with selector: {selector}")
                 
-                if strategy == "playwright":
-                     await page.click(buy_selector, timeout=2000)
-                     
-                elif strategy == "js_click":
-                     await page.evaluate(f"document.querySelector('{buy_selector}').click()")
-                     
-                elif strategy == "js_events":
-                     await page.evaluate(f"""() => {{
-                        const el = document.querySelector('{buy_selector}');
-                        if(el) {{
-                            el.dispatchEvent(new Event('mousedown', {{bubbles: true}}));
-                            el.dispatchEvent(new Event('mouseup', {{bubbles: true}}));
-                            el.dispatchEvent(new Event('click', {{bubbles: true}}));
+                if method_name.startswith("playwright"):
+                    await page.click(selector, timeout=3000, force=True)
+                else:
+                    # JS click with force
+                    await page.evaluate(f"""() => {{
+                        const el = document.querySelector('{selector}');
+                        if (el) {{
+                            el.click();
+                            // Also try dispatching change event on the input
+                            const input = document.querySelector('input[value="BUY"]');
+                            if (input) {{
+                                input.checked = true;
+                                input.dispatchEvent(new Event('change', {{bubbles: true}}));
+                            }}
                         }}
-                     }}""")
+                    }}""")
                 
                 # Wait for UI update
                 await page.wait_for_timeout(500)
                 
-                # Validate state
-                if await page.locator(f"{buy_selector}.active").count() > 0:
-                    print(f"[DEBUG] Success: BUY toggle activated via {strategy}")
+                # Validate state - check if input is now checked
+                is_checked = await page.evaluate("""() => {
+                    const input = document.querySelector('input[value="BUY"]');
+                    return input && input.checked;
+                }""")
+                
+                if is_checked:
+                    print(f"[DEBUG] Success: BUY toggle activated via {method_name}")
                     is_buy_active = True
                     break
-                else:
-                    # Fallback check for style if class not used
-                    is_green = await page.evaluate(f"""() => {{
-                        const el = document.querySelector('{buy_selector}');
-                        return el && window.getComputedStyle(el).backgroundColor.includes('green');
-                    }}""")
-                    if is_green:
-                        print(f"[DEBUG] Success: BUY toggle activated (style check) via {strategy}")
-                        is_buy_active = True
-                        break
+                    
+                # Fallback: check for active class
+                if await page.locator(".order__options--buy.active").count() > 0:
+                    print(f"[DEBUG] Success: BUY toggle activated (class check) via {method_name}")
+                    is_buy_active = True
+                    break
                         
             except Exception as e:
-                print(f"[DEBUG] Strategy {strategy} failed: {e}")
+                print(f"[DEBUG] Strategy {method_name} failed: {e}")
                 continue
                 
         if not is_buy_active:
              print("[DEBUG] WARNING: Could not verify BUY toggle state! Proceeding anyway but order might fail.")
         else:
              print("[DEBUG] BUY toggle confirmed active")
+
 
         
         # === STEP 3: Wait for symbol to load (from URL param) and verify ===

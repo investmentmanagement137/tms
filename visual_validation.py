@@ -45,36 +45,47 @@ async def visual_validation():
             
             print("Visual Validation: Toggling Buy/Sell buttons...")
             
-            # Selectors based on buy_stock.py and sell_stock.py
-            # The toggle is usually custom labels or radio buttons
-            
-            # Let's inspect potential selectors from buy/sell scripts
-            # Buy: .order__options--buy
-            # Sell: .order__options--sell
+            # Corrected selectors - the radio input is hidden, clicks must go to label
+            buy_label_selector = ".order__options--buy label"
+            sell_label_selector = ".order__options--sell label"
             
             for i in range(3):
                 print(f"Loop {i+1}/3")
                 
-                # Click BUY
+                # Click BUY label
                 print(">> Switch to BUY (Green)")
-                await page.click(".order__options--buy")
+                try:
+                    await page.click(buy_label_selector, timeout=3000, force=True)
+                except:
+                    # Fallback to input
+                    await page.evaluate("""() => {
+                        const input = document.querySelector('input[value="BUY"]');
+                        if (input) { input.checked = true; input.dispatchEvent(new Event('change', {bubbles: true})); }
+                    }""")
                 await page.wait_for_timeout(2000)
                 
-                # Visual check via console (optional)
+                # Visual check - verify input is checked
                 is_buy_active = await page.evaluate("""() => {
-                    const el = document.querySelector('.order__options--buy');
-                    return el && (el.classList.contains('active') || window.getComputedStyle(el).backgroundColor.includes('green'));
+                    const input = document.querySelector('input[value="BUY"]');
+                    return input && input.checked;
                 }""")
                 print(f"Verified BUY active: {is_buy_active}")
 
-                # Click SELL
+                # Click SELL label
                 print(">> Switch to SELL (Red)")
-                await page.click(".order__options--sell")
+                try:
+                    await page.click(sell_label_selector, timeout=3000, force=True)
+                except:
+                    # Fallback to input
+                    await page.evaluate("""() => {
+                        const input = document.querySelector('input[value="SELL"]');
+                        if (input) { input.checked = true; input.dispatchEvent(new Event('change', {bubbles: true})); }
+                    }""")
                 await page.wait_for_timeout(2000)
                 
                 is_sell_active = await page.evaluate("""() => {
-                    const el = document.querySelector('.order__options--sell');
-                    return el && (el.classList.contains('active') || window.getComputedStyle(el).backgroundColor.includes('red'));
+                    const input = document.querySelector('input[value="SELL"]');
+                    return input && input.checked;
                 }""")
                 print(f"Verified SELL active: {is_sell_active}")
 
