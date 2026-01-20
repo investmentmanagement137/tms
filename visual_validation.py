@@ -45,47 +45,53 @@ async def visual_validation():
             
             print("Visual Validation: Toggling Buy/Sell buttons...")
             
-            # Corrected selectors - the radio input is hidden, clicks must go to label
-            buy_label_selector = ".order__options--buy label"
-            sell_label_selector = ".order__options--sell label"
+            # Corrected selectors based on actual DOM structure from user screenshots:
+            # - Uses .toggler-btn-wrapper labels (first for Buy, second for Sell)
+            # - Active state indicated by .is-active class on label
+            # - Parent container changes class: .box-buy or .box-sell
             
             for i in range(3):
                 print(f"Loop {i+1}/3")
                 
-                # Click BUY label
+                # Click BUY (first toggler)
                 print(">> Switch to BUY (Green)")
                 try:
-                    await page.click(buy_label_selector, timeout=3000, force=True)
+                    await page.click(".toggler-btn-wrapper:first-of-type", timeout=3000, force=True)
                 except:
-                    # Fallback to input
+                    # Fallback to JS
                     await page.evaluate("""() => {
-                        const input = document.querySelector('input[value="BUY"]');
-                        if (input) { input.checked = true; input.dispatchEvent(new Event('change', {bubbles: true})); }
+                        const togglers = document.querySelectorAll('.toggler-btn-wrapper');
+                        if (togglers.length > 0) togglers[0].click();
                     }""")
                 await page.wait_for_timeout(2000)
                 
-                # Visual check - verify input is checked
+                # Verify BUY is active
                 is_buy_active = await page.evaluate("""() => {
-                    const input = document.querySelector('input[value="BUY"]');
-                    return input && input.checked;
+                    const container = document.querySelector('.box-order-entry');
+                    const togglers = document.querySelectorAll('.toggler-btn-wrapper');
+                    return (container && container.classList.contains('box-buy')) || 
+                           (togglers.length > 0 && togglers[0].classList.contains('is-active'));
                 }""")
                 print(f"Verified BUY active: {is_buy_active}")
 
-                # Click SELL label
+                # Click SELL (second toggler)
                 print(">> Switch to SELL (Red)")
                 try:
-                    await page.click(sell_label_selector, timeout=3000, force=True)
+                    await page.click(".toggler-btn-wrapper:last-of-type", timeout=3000, force=True)
                 except:
-                    # Fallback to input
+                    # Fallback to JS
                     await page.evaluate("""() => {
-                        const input = document.querySelector('input[value="SELL"]');
-                        if (input) { input.checked = true; input.dispatchEvent(new Event('change', {bubbles: true})); }
+                        const togglers = document.querySelectorAll('.toggler-btn-wrapper');
+                        if (togglers.length > 1) togglers[1].click();
                     }""")
                 await page.wait_for_timeout(2000)
                 
+                # Verify SELL is active
                 is_sell_active = await page.evaluate("""() => {
-                    const input = document.querySelector('input[value="SELL"]');
-                    return input && input.checked;
+                    const container = document.querySelector('.box-order-entry');
+                    const togglers = document.querySelectorAll('.toggler-btn-wrapper');
+                    return (container && container.classList.contains('box-sell')) || 
+                           (togglers.length > 1 && togglers[1].classList.contains('is-active'));
                 }""")
                 print(f"Verified SELL active: {is_sell_active}")
 

@@ -1,6 +1,7 @@
 import asyncio
 from urllib.parse import urlencode
 from .toast_capture import capture_all_popups, wait_for_toast, is_error_message
+from .utils import set_toggle_position, set_symbol
 
 async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     """
@@ -16,8 +17,8 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     print(f"\n[DEBUG] Placing SELL Order: {symbol}, Qty: {quantity}, Price: {price}, Instrument: {instrument}")
     
     base_url = tms_url.rstrip('/')
-    # Only symbol parameter works natively - use it!
-    order_url = f"{base_url}/tms/me/memberclientorderentry?symbol={symbol}"
+    # Remove symbol from URL for manual entry
+    order_url = f"{base_url}/tms/me/memberclientorderentry"
     
     print(f"[DEBUG] Navigating to: {order_url}")
     
@@ -35,9 +36,19 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     }
     
     try:
-        # Navigate - symbol will be auto-filled via URL param
+        # Navigate without symbol
         await page.goto(order_url, wait_until='networkidle')
         await page.wait_for_timeout(2000)  # Wait for Angular to fully load
+
+        # === STEP 0: Set Symbol Manually (Requested by User) ===
+        print(f"[DEBUG] Step 0: Setting symbol {symbol} manually...")
+        if not await set_symbol(page, symbol):
+            print(f"[DEBUG] Failed to set symbol {symbol}")
+            result["status"] = "FAILED"
+            result["message"] = f"Failed to set symbol {symbol}"
+            return result
+        
+        await page.wait_for_timeout(1000)
         
         # === STEP 1: Set Instrument via JS (if not EQ) ===
         if instrument != "EQ":
@@ -64,77 +75,8 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         
         # === STEP 2: Activate SELL toggle with robust retry ===
         print("[DEBUG] Step 2: Activating SELL toggle...")
-        is_sell_active = False
+        is_sell_active = await set_toggle_position(page, "sell")
         
-        # Multiple selector strategies - the radio input is hidden, clicks must go to label
-        selectors_and_methods = [
-            ("playwright_label", ".order__options--sell label"),
-            ("playwright_input", "input[value='SELL']"),
-            ("js_label", ".order__options--sell label"),
-            ("js_input", "input[value='SELL']"),
-        ]
-        
-        for method_name, selector in selectors_and_methods:
-            try:
-                # Check if already active (parent div gets .active class or form control changes)
-                if await page.locator(".order__options--sell.active").count() > 0:
-                    print("[DEBUG] SELL toggle already active!")
-                    is_sell_active = True
-                    break
-                    
-                # Also check if input is checked
-                is_checked = await page.evaluate("""() => {
-                    const input = document.querySelector('input[value="SELL"]');
-                    return input && input.checked;
-                }""")
-                if is_checked:
-                    print("[DEBUG] SELL input already checked!")
-                    is_sell_active = True
-                    break
-                
-                print(f"[DEBUG] Trying toggle: {method_name} with selector: {selector}")
-                
-                if method_name.startswith("playwright"):
-                    await page.click(selector, timeout=3000, force=True)
-                else:
-                    # JS click with force
-                    await page.evaluate(f"""() => {{
-                        const el = document.querySelector('{selector}');
-                        if (el) {{
-                            el.click();
-                            // Also try dispatching change event on the input
-                            const input = document.querySelector('input[value="SELL"]');
-                            if (input) {{
-                                input.checked = true;
-                                input.dispatchEvent(new Event('change', {{bubbles: true}}));
-                            }}
-                        }}
-                    }}""")
-                
-                # Wait for UI update
-                await page.wait_for_timeout(500)
-                
-                # Validate state - check if input is now checked
-                is_checked = await page.evaluate("""() => {
-                    const input = document.querySelector('input[value="SELL"]');
-                    return input && input.checked;
-                }""")
-                
-                if is_checked:
-                    print(f"[DEBUG] Success: SELL toggle activated via {method_name}")
-                    is_sell_active = True
-                    break
-                    
-                # Fallback: check for active class
-                if await page.locator(".order__options--sell.active").count() > 0:
-                    print(f"[DEBUG] Success: SELL toggle activated (class check) via {method_name}")
-                    is_sell_active = True
-                    break
-                        
-            except Exception as e:
-                print(f"[DEBUG] Strategy {method_name} failed: {e}")
-                continue
-                
         if not is_sell_active:
              print("[DEBUG] WARNING: Could not verify SELL toggle state! Proceeding anyway but order might fail.")
         else:
@@ -142,19 +84,9 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
 
 
         
-        # === STEP 3: Wait for symbol to load (from URL param) and verify ===
-        print(f"[DEBUG] Step 3: Verifying Symbol: {symbol}")
-        await page.wait_for_timeout(1000)
-        
-        # Check if symbol dropdown appeared and needs clicking
-        dropdown = page.locator(".dropdown-menu li a").first
-        try:
-            if await dropdown.is_visible(timeout=2000):
-                await dropdown.click()
-                print("[DEBUG] Symbol dropdown item clicked")
-                await page.wait_for_timeout(500)
-        except:
-            print("[DEBUG] No dropdown visible, symbol may already be set")
+        # === STEP 3: Symbol already handled in Step 0 ===
+        print(f"[DEBUG] Step 3: Symbol {symbol} verification done in Step 0")
+        # await page.wait_for_timeout(1000)
         
         # === STEP 4: Set Quantity via JS ===
         print(f"[DEBUG] Step 4: Setting Quantity to {quantity} via JS...")

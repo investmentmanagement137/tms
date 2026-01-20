@@ -327,3 +327,290 @@ async def perform_login(page, username, password, api_key, tms_url):
     
     print("[LOGIN] ❌ All login attempts exhausted")
     return False
+
+async def get_toggle_state(page):
+    """
+    Get the current toggle state.
+    Returns 'buy', 'sell', 'neutral', or None if not found.
+    """
+    try:
+        # Check parent container classes first (fastest)
+        container_class = await page.evaluate("""() => {
+            const container = document.querySelector('.box-order-entry');
+            return container ? container.className : '';
+        }""")
+        
+        if "box-buy" in container_class:
+            return "buy"
+        if "box-sell" in container_class:
+            return "sell"
+            
+        # Fallback to checking active wrapper
+        result = await page.evaluate("""() => {
+            const wrappers = document.querySelectorAll('app-three-state-toggle .xtoggler-btn-wrapper, .toggler-btn-wrapper');
+            for (let i = 0; i < wrappers.length; i++) {
+                if (wrappers[i].classList.contains('is-active')) {
+                    if (i === 0) return 'sell'; // Left is usually Sell
+                    if (i === wrappers.length - 1) return 'buy'; // Right is usually Buy
+                    return 'neutral';
+                }
+            }
+            return null;
+        }""")
+        return result
+    except Exception as e:
+        print(f"[UTILS] Error getting toggle state: {e}")
+        return None
+
+async def set_toggle_position(page, action):
+    """
+    Set the Buy/Sell toggle to the specified position.
+    
+    Args:
+        page: Playwright page object
+        action: 'buy' or 'sell'
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    action = action.lower()
+    if action not in ['buy', 'sell']:
+        print(f"[UTILS] Invalid action: {action}")
+        return False
+        
+    print(f"[UTILS] Setting toggle to: {action.upper()}")
+    
+    try:
+        # Wait for toggle to be present using broad selector to support multiple versions
+        # Documentation says `app-three-state-toggle`
+        await page.wait_for_selector("app-three-state-toggle", timeout=10000)
+    except:
+        print("[UTILS] Toggle component not found (timeout)")
+        return False
+
+    # Check current state first
+    current_state = await get_toggle_state(page)
+    if current_state == action:
+        print(f"[UTILS] Toggle already set to {action.upper()}")
+        return True
+
+    # Try standard click first
+    try:
+        # Determine index: 0 for Sell, -1 for Buy based on doc
+        # "Sell" is Left (0), "Buy" is Right (Last/2)
+        if action == 'sell':
+            index = 0
+            # Also try text locator
+            text_locator = page.locator("label.order__options--sell, label:has-text('Sell')").first
+        else: # buy
+            index = -1 # Playwright uses count-1 or nth(-1) logic manually
+            text_locator = page.locator("label.order__options--buy, label:has-text('Buy')").first
+            
+        # Strategy 1: Click the specific position wrapper
+        # The documentation highlights .xtoggler-btn-wrapper
+        # But existing code also used .toggler-btn-wrapper. We'll try both.
+        
+        wrappers = page.locator("app-three-state-toggle .xtoggler-btn-wrapper, app-three-state-toggle .toggler-btn-wrapper")
+        count = await wrappers.count()
+        
+        if count >= 2:
+            target_index = 0 if action == 'sell' else count - 1
+            await wrappers.nth(target_index).click(force=True)
+            print(f"[UTILS] Clicked wrapper index {target_index}")
+            await page.wait_for_timeout(500)
+            
+            if await get_toggle_state(page) == action:
+                return True
+        else:
+            print(f"[UTILS] Found only {count} toggle wrappers, unexpected.")
+
+    except Exception as e:
+        print(f"[UTILS] Click strategy failed: {e}")
+
+    # Strategy 2: Javascript Injection (Most reliable per doc)
+    try:
+        print("[UTILS] Trying JS injection strategy...")
+        success = await page.evaluate(f"""(action) => {{
+            const toggler = document.querySelector('app-three-state-toggle');
+            if (!toggler) return false;
+            
+            // support both class names just in case
+            const wrappers = toggler.querySelectorAll('.xtoggler-btn-wrapper, .toggler-btn-wrapper');
+            if (wrappers.length < 2) return false;
+            
+            const index = action === 'buy' ? wrappers.length - 1 : 0;
+            const target = wrappers[index];
+            
+            if (target) {{
+                // Click the wrapper
+                target.click();
+                
+                // Find and click internal radio if present
+                const radio = target.querySelector('input[type="radio"]');
+                if (radio) {{
+                    radio.checked = true;
+                    radio.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                    radio.dispatchEvent(new Event('click', {{ bubbles: true }}));
+                }}
+                
+                return true;
+            }}
+            return false;
+        }}""", action)
+        
+        await page.wait_for_timeout(500)
+        
+        if await get_toggle_state(page) == action:
+            print(f"[UTILS] JS injection success")
+            return True
+            
+    except Exception as e:
+        print(f"[UTILS] JS strategy failed: {e}")
+
+    # Final check
+    final_state = await get_toggle_state(page)
+    if final_state == action:
+        # User Request: Check if the BUY/SELL button appeared
+        # Image shows a blue button with text "BUY" (or likely "SELL")
+        btn_text = "BUY" if action == "buy" else "SELL"
+        print(f"[UTILS] Checking if {btn_text} button appeared...")
+        
+        try:
+            # Look for button with specific text
+            # Broad selectors to catch it
+            btn_selectors = [
+                f"button:has-text('{btn_text}')",
+                f"button[type='submit']:has-text('{btn_text}')",
+                ".box-order-entry button.btn-primary",
+                ".order__form button.btn-primary"
+            ]
+            
+            button_found = False
+            for selector in btn_selectors:
+                if await page.locator(selector).count() > 0:
+                    btn = page.locator(selector).first
+                    if await btn.is_visible():
+                        txt = await btn.text_content()
+                        if btn_text in txt.upper():
+                            print(f"[UTILS] ✅ {btn_text} button appeared and is visible")
+                            button_found = True
+                            break
+            
+            if not button_found:
+                 print(f"[UTILS] ⚠️ Toggle State check passed, but {btn_text} button NOT found/visible yet")
+                 
+        except Exception as e:
+            print(f"[UTILS] Error checking button visibility: {e}")
+            
+        return True
+        
+    print(f"[UTILS] Failed to set toggle to {action}. Stuck at: {final_state}")
+    return False
+
+async def set_symbol(page, symbol):
+    """
+    Manually enters the symbol into the order entry form.
+    Returns True if successful, False otherwise.
+    """
+    print(f"[UTILS] Setting symbol to: {symbol}")
+    try:
+        # 1. Find input field
+        # Selectors based on common Angular forms in TMS
+        input_selectors = [
+            "input[formcontrolname='companyName']",
+            "input[placeholder*='Symbol']",
+            "input[placeholder*='Company']",
+            ".k-autocomplete input",
+            "kendo-autocomplete input"
+        ]
+        
+        inp = None
+        for selector in input_selectors:
+            try:
+                if await page.locator(selector).count() > 0:
+                    inp = page.locator(selector).first
+                    print(f"[UTILS] Found symbol input: {selector}")
+                    break
+            except: continue
+            
+        if not inp:
+            print("[UTILS] Could not find symbol input field")
+            return False
+            
+        # 2. Clear and Type
+        await inp.click()
+        await inp.clear()
+        
+        # Type slowly to trigger autocomplete
+        await page.wait_for_timeout(200)
+        await inp.type(symbol, delay=100)
+        
+        # 3. Wait for Dropdown Options
+        print("[UTILS] Waiting for dropdown suggestions...")
+        
+        # Just wait a bit for network/processing
+        await page.wait_for_timeout(1000)
+        
+        # 4. click the item
+        # Try finding strict match first, then loose match
+        
+        # Strategy A: Click the first item in the dropdown list (usually the best match)
+        # TMS often uses kendo-popup or .dropdown-menu
+        
+        # Wait for any popup/list item
+        try:
+             # Common container for these lists
+             await page.wait_for_selector(".k-list-container, .dropdown-menu, .k-popup", timeout=5000)
+        except:
+             print("[UTILS] Dropdown container did not appear")
+             
+        # Look for the item
+        clicked = False
+        item_selectors = [
+            f"li:has-text('{symbol}')", # generic li
+            f".k-item:has-text('{symbol}')", # kendo item
+            f"a:has-text('{symbol}')", # link item
+            ".k-list-item" # fallback to first item
+        ]
+        
+        for selector in item_selectors:
+            try:
+                items = page.locator(selector)
+                count = await items.count()
+                if count > 0:
+                    # Prefer exact match if possible, otherwise first
+                    # Loop to find exact match if multiple
+                    target = items.first
+                    for i in range(count):
+                        txt = await items.nth(i).text_content()
+                        if txt and symbol.upper() in txt.upper():
+                            target = items.nth(i)
+                            if symbol.upper() == txt.strip().split()[0]: # Perfect match at start
+                                break
+                    
+                    await target.click()
+                    print(f"[UTILS] Clicked symbol dropdown item: {selector}")
+                    clicked = True
+                    break
+            except: continue
+            
+        if not clicked:
+            print("[UTILS] Could not find/click symbol in dropdown. Trying Tab key...")
+            await inp.press("Tab")
+            
+        # 5. Validation - Wait for price/qty fields to potentially enable or check input value
+        await page.wait_for_timeout(500)
+        
+        # Verify value in input
+        val = await inp.input_value()
+        if symbol.upper() in val.upper():
+            print(f"[UTILS] Symbol set confirmed: {val}")
+            return True
+        else:
+            print(f"[UTILS] Symbol set mismatch? Input has: {val}")
+            return False
+
+    except Exception as e:
+        print(f"[UTILS] Error setting symbol: {e}")
+        return False
+
