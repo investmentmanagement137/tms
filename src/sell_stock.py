@@ -62,18 +62,68 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         else:
             print("[DEBUG] Step 1: Instrument is EQ (default), skipping")
         
-        # === STEP 2: Click SELL toggle via JS ===
-        print("[DEBUG] Step 2: Activating SELL toggle via JS...")
-        await page.evaluate("""() => {
-            // Find and click the SELL side of the toggle
-            const sellLabel = document.querySelector('.order__options--sell');
-            if (sellLabel) {
-                sellLabel.click();
-                console.log('SELL toggle clicked');
-            }
-        }""")
-        await page.wait_for_timeout(300)
-        print("[DEBUG] SELL toggle activated")
+        # === STEP 2: Activate SELL toggle with robust retry ===
+        print("[DEBUG] Step 2: Activating SELL toggle...")
+        sell_selector = ".order__options--sell"
+        is_sell_active = False
+        
+        # Click stratgies to try
+        strategies = ["playwright", "js_click", "js_events"]
+        
+        for strategy in strategies:
+            try:
+                # Check if already active
+                if await page.locator(f"{sell_selector}.active").count() > 0:
+                    print("[DEBUG] SELL toggle already active!")
+                    is_sell_active = True
+                    break
+                
+                print(f"[DEBUG] Trying toggle strategy: {strategy}")
+                
+                if strategy == "playwright":
+                     await page.click(sell_selector, timeout=2000)
+                     
+                elif strategy == "js_click":
+                     await page.evaluate(f"document.querySelector('{sell_selector}').click()")
+                     
+                elif strategy == "js_events":
+                     await page.evaluate(f"""() => {{
+                        const el = document.querySelector('{sell_selector}');
+                        if(el) {{
+                            el.dispatchEvent(new Event('mousedown', {{bubbles: true}}));
+                            el.dispatchEvent(new Event('mouseup', {{bubbles: true}}));
+                            el.dispatchEvent(new Event('click', {{bubbles: true}}));
+                        }}
+                     }}""")
+                
+                # Wait for UI update
+                await page.wait_for_timeout(500)
+                
+                # Validate state
+                if await page.locator(f"{sell_selector}.active").count() > 0:
+                    print(f"[DEBUG] Success: SELL toggle activated via {strategy}")
+                    is_sell_active = True
+                    break
+                else:
+                    # Fallback check for style if class not used
+                    is_red = await page.evaluate(f"""() => {{
+                        const el = document.querySelector('{sell_selector}');
+                        return el && window.getComputedStyle(el).backgroundColor.includes('red');
+                    }}""")
+                    if is_red:
+                        print(f"[DEBUG] Success: SELL toggle activated (style check) via {strategy}")
+                        is_sell_active = True
+                        break
+                        
+            except Exception as e:
+                print(f"[DEBUG] Strategy {strategy} failed: {e}")
+                continue
+                
+        if not is_sell_active:
+             print("[DEBUG] WARNING: Could not verify SELL toggle state! Proceeding anyway but order might fail.")
+        else:
+             print("[DEBUG] SELL toggle confirmed active")
+
         
         # === STEP 3: Wait for symbol to load (from URL param) and verify ===
         print(f"[DEBUG] Step 3: Verifying Symbol: {symbol}")

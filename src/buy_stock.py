@@ -62,18 +62,68 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         else:
             print("[DEBUG] Step 1: Instrument is EQ (default), skipping")
         
-        # === STEP 2: Click BUY toggle via JS ===
-        print("[DEBUG] Step 2: Activating BUY toggle via JS...")
-        await page.evaluate("""() => {
-            // Find and click the BUY side of the toggle
-            const buyLabel = document.querySelector('.order__options--buy');
-            if (buyLabel) {
-                buyLabel.click();
-                console.log('BUY toggle clicked');
-            }
-        }""")
-        await page.wait_for_timeout(300)
-        print("[DEBUG] BUY toggle activated")
+        # === STEP 2: Activate BUY toggle with robust retry ===
+        print("[DEBUG] Step 2: Activating BUY toggle...")
+        buy_selector = ".order__options--buy"
+        is_buy_active = False
+        
+        # Click stratgies to try
+        strategies = ["playwright", "js_click", "js_events"]
+        
+        for strategy in strategies:
+            try:
+                # Check if already active
+                if await page.locator(f"{buy_selector}.active").count() > 0:
+                    print("[DEBUG] BUY toggle already active!")
+                    is_buy_active = True
+                    break
+                
+                print(f"[DEBUG] Trying toggle strategy: {strategy}")
+                
+                if strategy == "playwright":
+                     await page.click(buy_selector, timeout=2000)
+                     
+                elif strategy == "js_click":
+                     await page.evaluate(f"document.querySelector('{buy_selector}').click()")
+                     
+                elif strategy == "js_events":
+                     await page.evaluate(f"""() => {{
+                        const el = document.querySelector('{buy_selector}');
+                        if(el) {{
+                            el.dispatchEvent(new Event('mousedown', {{bubbles: true}}));
+                            el.dispatchEvent(new Event('mouseup', {{bubbles: true}}));
+                            el.dispatchEvent(new Event('click', {{bubbles: true}}));
+                        }}
+                     }}""")
+                
+                # Wait for UI update
+                await page.wait_for_timeout(500)
+                
+                # Validate state
+                if await page.locator(f"{buy_selector}.active").count() > 0:
+                    print(f"[DEBUG] Success: BUY toggle activated via {strategy}")
+                    is_buy_active = True
+                    break
+                else:
+                    # Fallback check for style if class not used
+                    is_green = await page.evaluate(f"""() => {{
+                        const el = document.querySelector('{buy_selector}');
+                        return el && window.getComputedStyle(el).backgroundColor.includes('green');
+                    }}""")
+                    if is_green:
+                        print(f"[DEBUG] Success: BUY toggle activated (style check) via {strategy}")
+                        is_buy_active = True
+                        break
+                        
+            except Exception as e:
+                print(f"[DEBUG] Strategy {strategy} failed: {e}")
+                continue
+                
+        if not is_buy_active:
+             print("[DEBUG] WARNING: Could not verify BUY toggle state! Proceeding anyway but order might fail.")
+        else:
+             print("[DEBUG] BUY toggle confirmed active")
+
         
         # === STEP 3: Wait for symbol to load (from URL param) and verify ===
         print(f"[DEBUG] Step 3: Verifying Symbol: {symbol}")
