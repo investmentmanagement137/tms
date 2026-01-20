@@ -1,0 +1,15 @@
+{
+  "name": "tms-automation-js",
+  "version": "1.0.0",
+  "description": "TMS Trade Automation in JavaScript",
+  "main": "src/trade.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/trade.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0",
+    "@google/generative-ai": "^0.1.3",
+    "fs": "0.0.1-security"
+  }
+}
