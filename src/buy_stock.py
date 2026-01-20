@@ -165,10 +165,10 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
              print("[DEBUG] ⚠️ No specific confirmation button found (BUY/Confirm). Checked multiple selectors.")
         
         # === STEP 8: Capture Result ===
-        await page.wait_for_timeout(2000)
-        
-        # Check for popup/toast messages using toast_capture module
-        popup_msg = await capture_all_popups(page)
+        # Wait for toast to appear after confirmation click (toasts are transient)
+        print("[DEBUG] Waiting for toast notification...")
+        toast_messages = await wait_for_toast(page, timeout_ms=5000)
+        popup_msg = " ".join(toast_messages) if toast_messages else ""
         print(f"[DEBUG] Toast/Popup message: {popup_msg}")
         
         if popup_msg:
