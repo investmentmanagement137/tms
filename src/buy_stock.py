@@ -119,109 +119,51 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         print("[DEBUG] Step 6: Looking for Submit button...")
         await page.wait_for_timeout(500)  # Wait for form validation
         
-        # Find and click the submit button more robustly
+        # Strategy from JS snippet: Try generic submit button first
         submit_clicked = False
+        submit_btn = page.locator('button[type="submit"]').first
         
-        # The submit button is within the order entry form - target specifically
-        # Analysis shows it might just be 'btn btn-sm' with text '-' (icon) and type='submit'
-        # It is NOT always btn-primary
-        submit_selectors = [
-            ".box-order-entry button[type='submit']",
-            ".order__form button[type='submit']", 
-            ".box-order-entry button.btn-sm:not(.btn-default)",
-            ".order__form button.btn-sm:not(.btn-default)",
-            "button.btn-sm:has-text('-')", # Fallback for icon button
-            "button:has(i.fa-plus)",      # Icon fallback
-            "button:has(i.fa-check)",     # Icon fallback
-            "button.btn-primary",         # Broad fallback
-            "button[type='submit']",      # Broadest fallback
-        ]
-        
-        for selector in submit_selectors:
-            try:
-                # Get all matches
-                btns = page.locator(selector)
-                count = await btns.count()
-                
-                for i in range(count):
-                    btn = btns.nth(i)
-                    if await btn.is_visible() and await btn.is_enabled():
-                        # Check if it's not a cancel button
-                        txt = await btn.text_content()
-                        if txt and ("cancel" in txt.lower() or "close" in txt.lower()):
-                            continue
-                            
-                        await btn.click()
-                        print(f"[DEBUG] Clicked submit button with selector: {selector} (Index {i})")
-                        submit_clicked = True
-                        break
-                if submit_clicked: break
-            except Exception as e:
-                print(f"[DEBUG] Selector {selector} failed: {str(e)[:50]}")
-                continue
-        
-        if not submit_clicked:
-            print("[DEBUG] Submit button not found via locators, trying targeted JS click...")
-            # More targeted JS - find button after price input within form
-            result = await page.evaluate("""() => {
-                // Find the price input first
-                const priceInput = document.querySelector('input.form-price, input[formcontrolname="price"]');
-                if (priceInput) {
-                    // Find the closest form or container
-                    const container = priceInput.closest('.box-order-entry, form, .order-form');
-                    if (container) {
-                        // Find the primary submit button in this container
-                        const btn = container.querySelector('button.btn-primary.btn-lg:not([disabled])');
-                        if (btn) {
-                            btn.click();
-                            console.log('Clicked submit button in form container');
-                            return {success: true, btnClass: btn.className};
-                        }
-                    }
-                }
-                
-                // Fallback: Find the first visible, non-disabled btn-primary.btn-lg
-                const btns = document.querySelectorAll('button.btn-primary.btn-lg:not([disabled])');
-                for (const btn of btns) {
-                    const text = btn.innerText.trim().toLowerCase();
-                    // Skip buttons with known non-submit text
-                    if (!text || (!text.includes('update') && !text.includes('close') && !text.includes('cancel'))) {
-                        if (btn.offsetParent !== null) {  // Is visible
-                            btn.click();
-                            console.log('Clicked fallback button:', btn.className);
-                            return {success: true, btnClass: btn.className, fallback: true};
-                        }
-                    }
-                }
-                return {success: false};
-            }""")
-            print(f"[DEBUG] JS click result: {result}")
-            submit_clicked = result.get('success', False) if result else False
-        
+        try:
+            if await submit_btn.count() > 0:
+                 await submit_btn.click()
+                 print("[DEBUG] Clicked generic submit button (button[type='submit'])")
+                 submit_clicked = True
+            else:
+                 print("[DEBUG] Generic submit button not found, falling back to Enter key")
+                 await page.keyboard.press("Enter")
+                 submit_clicked = True
+        except Exception as e:
+            print(f"[DEBUG] Submit strategy failed: {e}")
+            
         # === STEP 7: Handle Confirmation Dialog (SweetAlert) ===
         print("[DEBUG] Step 7: Checking for confirmation dialog...")
-        await page.wait_for_timeout(1500)
+        await page.wait_for_timeout(1000) # Allow modal to appear
         
-        # TMS uses SweetAlert for confirmations - look for confirm button
+        # Priority list of selectors from JS snippet
+        # Key insight: Modals are usually appended to the end of the DOM, so use .last()
         confirm_selectors = [
-            ".swal2-confirm",  # SweetAlert confirm button
-            "button.swal2-confirm",
-            ".swal2-actions button.swal2-confirm",
-            "button:has-text('OK')",
+            f"button:has-text('BUY')",
+            f"button:has-text('Buy')", 
             "button:has-text('Confirm')",
             "button:has-text('Yes')"
         ]
         
+        clicked_confirm = False
         for selector in confirm_selectors:
             try:
-                confirm_btn = page.locator(selector).first
-                if await confirm_btn.count() > 0 and await confirm_btn.is_visible():
-                    await confirm_btn.click()
-                    print(f"[DEBUG] Clicked confirmation button: {selector}")
-                    await page.wait_for_timeout(1000)
-                    break
-            except:
-                continue
+                # Use .last() because modals are usually appended to the end of the DOM.
+                btn = page.locator(selector).last
+                
+                if await btn.count() > 0:
+                    if await btn.is_visible():
+                        print(f"[DEBUG] Found Confirmation Button: {selector}")
+                        await btn.click()
+                        clicked_confirm = True
+                        break
+            except: continue
+        
+        if not clicked_confirm:
+             print("[DEBUG] ⚠️ No specific confirmation button found (BUY/Confirm). Checked multiple selectors.")
         
         # === STEP 8: Capture Result ===
         await page.wait_for_timeout(2000)

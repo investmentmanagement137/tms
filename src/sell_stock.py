@@ -119,40 +119,52 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         print("[DEBUG] Step 6: Looking for Submit button...")
         await page.wait_for_timeout(500)  # Wait for form validation
         
+        # Strategy from JS snippet: Try generic submit button first
         submit_clicked = False
-        submit_selectors = [
-            ".box-order-entry button[type='submit']",
-            ".order__form button[type='submit']", 
-            ".box-order-entry button.btn-sm:not(.btn-default)",
-            ".order__form button.btn-sm:not(.btn-default)",
-            "button.btn-sm:has-text('-')", 
-            "button:has(i.fa-plus)",
-            "button:has(i.fa-check)",
-            "button.btn-primary",
-            "button[type='submit']",
+        submit_btn = page.locator('button[type="submit"]').first
+        
+        try:
+            if await submit_btn.count() > 0:
+                 await submit_btn.click()
+                 print("[DEBUG] Clicked generic submit button (button[type='submit'])")
+                 submit_clicked = True
+            else:
+                 print("[DEBUG] Generic submit button not found, falling back to Enter key")
+                 await page.keyboard.press("Enter")
+                 submit_clicked = True
+        except Exception as e:
+            print(f"[DEBUG] Submit strategy failed: {e}")
+            
+        # === STEP 7: Capture Result (Check for Confirmation Dialog first) ===
+        # Note: New JS snippet implies confirmation happens right after submit
+        print("[DEBUG] Step 7: Checking for confirmation dialog...")
+        await page.wait_for_timeout(1000) # Allow modal to appear
+        
+        # Priority list of selectors from JS snippet
+        # Key insight: Modals are usually appended to the end of the DOM, so use .last()
+        confirm_selectors = [
+            f"button:has-text('SELL')",
+            f"button:has-text('Sell')", 
+            "button:has-text('Confirm')",
+            "button:has-text('Yes')"
         ]
         
-        for selector in submit_selectors:
+        clicked_confirm = False
+        for selector in confirm_selectors:
             try:
-                btns = page.locator(selector)
-                count = await btns.count()
-                for i in range(count):
-                    btn = btns.nth(i)
-                    if await btn.is_visible() and await btn.is_enabled():
+                # Use .last() because modals are usually appended to the end of the DOM.
+                btn = page.locator(selector).last
+                
+                if await btn.count() > 0:
+                    if await btn.is_visible():
+                        print(f"[DEBUG] Found Confirmation Button: {selector}")
                         await btn.click()
-                        print(f"[DEBUG] Clicked submit button with selector: {selector}")
-                        submit_clicked = True
+                        clicked_confirm = True
                         break
-                if submit_clicked: break
             except: continue
             
-        if not submit_clicked:
-             print("[DEBUG] Submit button not found via locators, trying targeted JS click...")
-             # Fallback JS
-             await page.evaluate("""() => {
-                const btn = document.querySelector('button.btn-sm:not(.btn-default), button[type="submit"]');
-                if (btn) btn.click();
-             }""")
+        if not clicked_confirm:
+             print("[DEBUG] ⚠️ No specific confirmation button found (SELL/Confirm). Checked multiple selectors.")
         
         # === STEP 7: Capture Result ===
         await page.wait_for_timeout(2500)
