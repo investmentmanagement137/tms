@@ -40,10 +40,19 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         await page.goto(order_url, wait_until='networkidle')
         await page.wait_for_timeout(2000)  # Wait for Angular to fully load
 
-        # === STEP 1: Set Instrument via JS (if not EQ) ===
-        # User requested sequence: Instrument -> Toggle -> Symbol -> ...
+        # === STEP 1: Activate SELL toggle with robust retry ===
+        # Reverting to Toggle -> Instrument order to match working JS script
+        print("[DEBUG] Step 1: Activating SELL toggle...")
+        is_sell_active = await set_toggle_position(page, "sell")
+        
+        if not is_sell_active:
+             print("[DEBUG] WARNING: Could not verify SELL toggle state! Proceeding anyway but order might fail.")
+        else:
+             print("[DEBUG] SELL toggle confirmed active")
+
+        # === STEP 2: Set Instrument via JS (if not EQ) ===
         if instrument != "EQ":
-            print(f"[DEBUG] Step 1: Setting Instrument to {instrument} via JS...")
+            print(f"[DEBUG] Step 2: Setting Instrument to {instrument} via JS...")
             await page.evaluate(f"""() => {{
                 const select = document.querySelector('select.form-inst, select[formcontrolname="instType"]');
                 if (select) {{
@@ -62,19 +71,9 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             await page.wait_for_timeout(500)
             print(f"[DEBUG] Instrument set to: {instrument}")
         else:
-            print("[DEBUG] Step 1: Instrument is EQ (default), skipping")
+            print("[DEBUG] Step 2: Instrument is EQ (default), skipping")
         
-        # === STEP 2: Activate SELL toggle with robust retry ===
-        print("[DEBUG] Step 2: Activating SELL toggle...")
-        is_sell_active = await set_toggle_position(page, "sell")
-        
-        if not is_sell_active:
-             print("[DEBUG] WARNING: Could not verify SELL toggle state! Proceeding anyway but order might fail.")
-        else:
-             print("[DEBUG] SELL toggle confirmed active")
-
-        # === STEP 3: Set Symbol (After Instrument and Toggle) ===
-        # This matches the user's requested order: Instrument -> Toggle -> Symbol
+        # === STEP 3: Set Symbol (After Toggle and Instrument) ===
         print(f"[DEBUG] Step 3: Setting symbol {symbol} manually...")
         if not await set_symbol(page, symbol):
             print(f"[DEBUG] Failed to set symbol {symbol}")

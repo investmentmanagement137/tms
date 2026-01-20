@@ -381,11 +381,15 @@ async def set_toggle_position(page, action):
     print(f"[UTILS] Setting toggle to: {action.upper()}")
     
     try:
-        # Wait for toggle to be present using broad selector to support multiple versions
+        # Wait for toggle to be present using broad selector
         # Documentation says `app-three-state-toggle`
-        await page.wait_for_selector("app-three-state-toggle", timeout=10000)
+        # Increased timeout to 20s as sometimes it loads late
+        print("[UTILS] Waiting for app-three-state-toggle...")
+        await page.wait_for_selector("app-three-state-toggle", timeout=20000)
     except:
         print("[UTILS] Toggle component not found (timeout)")
+        # Try refreshing or checking if we are already in correct state via other means?
+        # For now just return False
         return False
 
     # Check current state first
