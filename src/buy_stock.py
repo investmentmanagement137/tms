@@ -40,17 +40,8 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         await page.goto(order_url, wait_until='networkidle')
         await page.wait_for_timeout(2000)  # Wait for Angular to fully load
         
-        # === STEP 0: Set Symbol Manually (Requested by User) ===
-        print(f"[DEBUG] Step 0: Setting symbol {symbol} manually...")
-        if not await set_symbol(page, symbol):
-            print(f"[DEBUG] Failed to set symbol {symbol}")
-            result["status"] = "FAILED"
-            result["message"] = f"Failed to set symbol {symbol}"
-            return result
-        
-        await page.wait_for_timeout(1000)
-        
         # === STEP 1: Set Instrument via JS (if not EQ) ===
+        # User requested sequence: Instrument -> Toggle -> Symbol -> ...
         if instrument != "EQ":
             print(f"[DEBUG] Step 1: Setting Instrument to {instrument} via JS...")
             await page.evaluate(f"""() => {{
@@ -82,12 +73,17 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         else:
              print("[DEBUG] BUY toggle confirmed active")
 
+        # === STEP 3: Set Symbol (After Instrument and Toggle) ===
+        # This matches the user's requested order: Instrument -> Toggle -> Symbol
+        print(f"[DEBUG] Step 3: Setting symbol {symbol} manually...")
+        if not await set_symbol(page, symbol):
+            print(f"[DEBUG] Failed to set symbol {symbol}")
+            result["status"] = "FAILED"
+            result["message"] = f"Failed to set symbol {symbol}"
+            return result
+        
+        await page.wait_for_timeout(1000)
 
-        
-        # === STEP 3: Symbol already handled in Step 0 ===
-        print(f"[DEBUG] Step 3: Symbol {symbol} verification done in Step 0")
-        # await page.wait_for_timeout(1000)
-        
         # === STEP 4: Set Quantity via JS ===
         print(f"[DEBUG] Step 4: Setting Quantity to {quantity} via JS...")
         await page.evaluate(f"""() => {{
