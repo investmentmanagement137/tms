@@ -113,6 +113,24 @@ async def execute(page, tms_url):
                     await page.wait_for_timeout(1000) # Wait for action
                     print("    ✅ Cancelled")
                     cancelled_count += 1
+
+                    # --- RELOAD to ensure fresh state ---
+                    print("[DEBUG] Reloading page to refresh order list...")
+                    await page.reload(wait_until='networkidle')
+                    await page.wait_for_timeout(2000)
+
+                    # Re-select 'Open' tab
+                    try:
+                        open_tab = page.locator('ul.k-tabstrip-items li span.k-link').filter(has_text="Open").first
+                        if await open_tab.count() == 0:
+                            open_tab = page.locator('text=Open').first
+                        await open_tab.click()
+                        await page.wait_for_timeout(1500)
+                    except Exception as e:
+                         print(f"[DEBUG] Error switching tab after reload: {e}")
+                    
+                    # Continue loop to re-extract rows
+                    continue
                 else:
                     print("    ⚠️ Confirmation dialog not found or not visible")
                     result["message"] += f"Confirmation missing for {target['symbol']}. "
