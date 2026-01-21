@@ -69,6 +69,9 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     try:
         # Navigate without symbol
         await page.goto(order_url, wait_until='networkidle')
+        # CRITICAL: Reload page to ensure fresh form state for batch orders
+        # Without this, subsequent orders in a batch may fail because goto to same URL doesn't reset form
+        await page.reload(wait_until='networkidle')
         await page.wait_for_timeout(2000)  # Wait for Angular to fully load
 
         # === STEP 1: Activate SELL toggle with robust retry ===
