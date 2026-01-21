@@ -1,7 +1,38 @@
 import asyncio
+import re
 from urllib.parse import urlencode
 from .toast_capture import capture_all_popups, wait_for_toast, is_error_message
 from .utils import set_toggle_position, set_symbol
+
+
+def parse_order_book_row(row_text):
+    """
+    Parse a tab-separated order book row into structured data.
+    
+    Input format: "1\t\n\tOPEN\tKSY\tBuy\t4000\t9.07\t4000\t36,280.00"
+    
+    Returns dict with: rowNum, status, symbol, side, quantity, price, remainingQty, totalAmount
+    """
+    # Split by tab and filter out empty strings and newlines
+    parts = [p.strip() for p in row_text.split('\t') if p.strip() and p.strip() != '\n']
+    
+    if len(parts) >= 8:
+        return {
+            "rowNum": int(parts[0]) if parts[0].isdigit() else parts[0],
+            "status": parts[1],
+            "symbol": parts[2],
+            "side": parts[3],
+            "quantity": int(parts[4].replace(',', '')) if parts[4].replace(',', '').isdigit() else parts[4],
+            "price": float(parts[5].replace(',', '')) if re.match(r'^[\d,\.]+$', parts[5]) else parts[5],
+            "remainingQty": int(parts[6].replace(',', '')) if parts[6].replace(',', '').isdigit() else parts[6],
+            "totalAmount": parts[7]  # Keep as string to preserve formatting
+        }
+    elif len(parts) >= 1:
+        # Partial row, return what we have
+        return {"raw": parts, "parseError": "Insufficient columns"}
+    else:
+        return {"raw": row_text, "parseError": "Could not parse"}
+
 
 async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
     """
@@ -201,7 +232,9 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             for i in range(min(count, 10)):
                 row_text = await rows.nth(i).inner_text()
                 if row_text.strip() and "No records" not in row_text:
-                    order_book.append({"row": i, "text": row_text.strip()})
+                    parsed_row = parse_order_book_row(row_text.strip())
+                    parsed_row["row"] = i  # Keep the index for reference
+                    order_book.append(parsed_row)
             
             result["orderBook"] = order_book
             print(f"[DEBUG] Extracted {len(order_book)} order book entries")
