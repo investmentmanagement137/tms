@@ -9,7 +9,7 @@ from apify import Actor
 from playwright.async_api import async_playwright
 
 # Import modular scripts
-from src import utils, login, buy_stock, sell_stock, daily_history, dashboard
+from src import utils, login, buy_stock, sell_stock, daily_history, dashboard, cancel_order
 
 
 async def main():
@@ -198,21 +198,33 @@ async def main():
 
 
 
+                # --- NEW: CANCEL ORDERS logic ---
+                cancel_order_flag = actor_input.get('cancelOrder', False)
+                if cancel_order_flag:
+                    Actor.log.info("Processing Order Cancellation Request...")
+                    cancel_res = await cancel_order.execute(page, tms_url)
+                    final_output["cancellation_result"] = cancel_res
+                    executed_any_order = True # Mark as active so we don't exit early
+                
                 # Check for Batch Orders / BATCH action
                 batch_orders = actor_input.get('orders', [])
                 check_orders_flag = actor_input.get('checkOrders', True)
                 check_dashboard_flag = actor_input.get('checkDashboard', True)
                 
-                executed_any_order = False
-
+                # executed_any_order is already initialized to False at line 206, but we set it True above if cancellation ran
+                
                 if (action == 'BATCH' or (batch_orders and len(batch_orders) > 0)):
                     if not batch_orders:
-                        Actor.log.warning('Action is BATCH but "orders" list is empty! Nothing to do.')
-                        Actor.log.info('✅ Workflow Completed (No Orders Executed)')
-                        await Actor.exit()
-                        return
+                        if not executed_any_order:
+                            Actor.log.warning('Action is BATCH but "orders" list is empty! Nothing to do.')
+                            Actor.log.info('✅ Workflow Completed (No Orders Executed)')
+                            await Actor.exit()
+                            return
+                        else:
+                            Actor.log.info("Batch orders list is empty, but other actions (Cancellation) were performed. Continuing...")
 
-                    Actor.log.info(f"Processing Batch of {len(batch_orders)} orders...")
+                    elif batch_orders: # Changed to elif to be explicit
+                        Actor.log.info(f"Processing Batch of {len(batch_orders)} orders...")
                     
                     for order in batch_orders:
                         o_symbol = str(order.get('symbol')).strip().upper()

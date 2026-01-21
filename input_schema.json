@@ -79,6 +79,12 @@
             "type": "boolean",
             "description": "If true, extract dashboard data (collateral, limits) after executing trades.",
             "default": true
+        },
+        "cancelOrder": {
+            "title": "Cancel Open Orders",
+            "type": "boolean",
+            "description": "If true, cancels all OPEN orders before processing new ones.",
+            "default": false
         }
     },
     "required": [
