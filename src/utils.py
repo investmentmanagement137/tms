@@ -36,7 +36,7 @@ async def solve_captcha(page, api_key):
         
         def generate():
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-2.0-flash',
                 contents=[
                     "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.",
                     image
