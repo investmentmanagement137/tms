@@ -116,11 +116,26 @@
                 }
             }
         },
+        "checkDashboard": {
+            "title": "Extract Dashboard (Post-Trade)?",
+            "type": "boolean",
+            "description": "If true, extracts summary from dashboard after trades.",
+            "default": true
+        },
         "checkOrders": {
             "title": "Verify Orders (Global)?",
             "type": "boolean",
             "description": "If true, scrapes order book after execution. Applies to BOTH Single and Batch modes.",
             "default": true
+        },
+        "proxyConfiguration": {
+            "title": "Proxy Configuration",
+            "type": "object",
+            "description": "Select proxies to be used by your crawler.",
+            "editor": "proxy",
+            "default": {
+                "useApifyProxy": true
+            }
         }
     },
     "required": [

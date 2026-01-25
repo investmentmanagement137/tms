@@ -51,12 +51,25 @@ async def main():
         # --- Geo-Location Logging ---
         try:
             import requests
+            # Use a short timeout for IP check
             ip_info = requests.get('http://ip-api.com/json/', timeout=5).json()
             country = ip_info.get('country', 'Unknown')
             monitor_ip = ip_info.get('query', 'Unknown')
-            Actor.log.info(f"📍 Actor Running From: {country} (IP: {monitor_ip})")
+            Actor.log.info(f"📍 Actor Container Location: {country} (IP: {monitor_ip})")
         except Exception as e:
-            Actor.log.warning(f"Could not determine location: {e}")
+            Actor.log.warning(f"Could not determine container location: {e}")
+            
+        # --- Proxy Configuration ---
+        proxy_url = None
+        try:
+            proxy_config = await Actor.create_proxy_configuration(actor_input=actor_input)
+            if proxy_config:
+                proxy_url = await proxy_config.new_url()
+                Actor.log.info(f"Using Proxy: {proxy_url}")
+            else:
+                Actor.log.info("No Proxy configured. Using direct connection (Container IP).")
+        except Exception as proxy_err:
+             Actor.log.warning(f"Failed to configure proxy: {proxy_err}")
         
         # Launch Playwright Browser
         Actor.log.info('Launching Playwright browser...')
@@ -72,7 +85,8 @@ async def main():
                     '--disable-blink-features=AutomationControlled', # Key for evasion
                     '--disable-infobars',
                     '--window-size=1920,1080',
-                ]
+                ],
+                proxy={"server": proxy_url} if proxy_url else None
             )
             
             # Create Context with User Agent (and optional storage state)
