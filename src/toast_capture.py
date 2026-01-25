@@ -61,7 +61,13 @@ async def capture_toasts(page) -> List[str]:
         ".toast-success",            # Green success toasts
         ".toast-warning",            # Yellow warning toasts
         ".toast-info",               # Blue info toasts
+        ".toast-info",               # Blue info toasts
         ".ngx-toastr",               # Angular toastr wrapper
+        "[role='alert']",            # Standard ARIA alert
+        ".alert",                    # Standard Bootstrap/Generic alert
+        ".error-message",            # Generic error class
+        ".validation-errors",        # Common validation container
+        ".text-danger",              # Common utility class for errors
     ]
     
     for selector in toast_selectors:
@@ -161,8 +167,13 @@ async def capture_all_popups(page) -> str:
         ".toast-container .toast-message",
         ".toast-message",
         ".toast-body",
-        ".alert-danger",
         ".alert-success",
+        # Generic & ARIA
+        "[role='alert']",
+        ".error-message",
+        ".validation-summary-errors",
+        ".text-danger",
+        ".invalid-feedback",  # Bootstrap form validation
     ]
     
     for selector in popup_selectors:
