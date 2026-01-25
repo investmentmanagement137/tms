@@ -9,54 +9,112 @@ from google import genai
 from google.genai import types
 from .toast_capture import log_toasts, capture_all_popups, is_error_message
 
-async def solve_captcha(page, api_key):
-    """Solves captcha using Gemini API (new google-genai SDK)."""
+async def wait_for_loading_screen_to_vanish(page):
+    """
+    Waits for common loading overlays/spinners to disappear.
+    Crucial for SPAs where URL changes before content is interactive.
+    """
+    print("[UTILS] Checking for post-login loading overlays...")
     try:
-        print("Attempting to solve captcha using Gemini API...")
+        # Common selectors based on standard frameworks and user report
+        # User mentioned "visually loading screen"
+        loaders = [
+            ".preloader",       # Found in HTML dump
+            ".load",            # Found in HTML dump
+            ".loading-overlay", 
+            "app-loading", 
+            ".k-loading-mask", 
+            ".spinner", 
+            ".ngx-spinner-overlay",
+            "text=Loading...",
+            "text=Processing..."
+        ]
         
-        print("Locating captcha image...")
-        try:
-            # Wait for captcha image
-            captcha_loc = page.locator('img.captcha-image-dimension')
-            await captcha_loc.wait_for(state='visible', timeout=5000)
-        except:
-            print("Could not find captcha image element.")
-            return None
-        
-        print("Capturing captcha screenshot...")
-        screenshot_bytes = await captcha_loc.screenshot()
-        image = Image.open(io.BytesIO(screenshot_bytes))
-        
-        print("Sending to Gemini API...")
-        # Client initialization
-        client = genai.Client(api_key=api_key)
-        
-        # We run this in a thread executor because the new SDK might still be sync-heavy or we just want to be safe
-        loop = asyncio.get_event_loop()
-        
-        def generate():
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=[
-                    "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.",
-                    image
-                ]
-            )
-            return response.text
-
-        captcha_text = await loop.run_in_executor(None, generate)
-        
-        if captcha_text:
-            captcha_text = captcha_text.strip()
-            print(f"Gemini solved captcha: '{captcha_text}'")
-            return captcha_text
-        else:
-             print("Gemini returned empty text.")
-             return None
+        for selector in loaders:
+            # check if exists and visible first to avoid unnecessary 30s waits if element is completely absent
+            if await page.locator(selector).count() > 0:
+                if await page.locator(selector).is_visible():
+                    print(f"[UTILS] ⏳ Detected loader '{selector}', waiting for it to vanish...")
+                    try:
+                        await page.locator(selector).wait_for(state='hidden', timeout=15000)
+                        print(f"[UTILS] ✅ Loader '{selector}' vanished.")
+                    except:
+                        print(f"[UTILS] ⚠️ Time out waiting for '{selector}' to vanish. Forcing removal...")
+                        # "Nuclear option": Force hide it via JS so we can interact with what's behind it
+                        try:
+                            await page.evaluate(f"(sel) => {{ const el = document.querySelector(sel); if(el) el.style.display = 'none'; }}", selector)
+                        except:
+                            pass
+                        
+        # Final small stabilization
+        await page.wait_for_timeout(500)
         
     except Exception as e:
-        print(f"Error solving captcha: {e}")
-        return None
+        print(f"[UTILS] Error detection loading screen: {e}")
+
+async def solve_captcha(page, api_key):
+    """Solves captcha using Gemini API (new google-genai SDK)."""
+    max_retries = 3
+    base_delay = 2
+
+    for attempt in range(max_retries + 1):
+        try:
+            print(f"Attempting to solve captcha using Gemini API (Attempt {attempt+1}/{max_retries+1})...")
+            
+            print("Locating captcha image...")
+            try:
+                # Wait for captcha image
+                captcha_loc = page.locator('img.captcha-image-dimension')
+                await captcha_loc.wait_for(state='visible', timeout=5000)
+            except:
+                print("Could not find captcha image element.")
+                return None
+            
+            print("Capturing captcha screenshot...")
+            screenshot_bytes = await captcha_loc.screenshot()
+            image = Image.open(io.BytesIO(screenshot_bytes))
+            
+            print("Sending to Gemini API...")
+            # Client initialization
+            client = genai.Client(api_key=api_key)
+            
+            # We run this in a thread executor because the new SDK might still be sync-heavy or we just want to be safe
+            loop = asyncio.get_event_loop()
+            
+            def generate():
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash',
+                    contents=[
+                        "What is the text in this captcha image? Return ONLY the alphanumeric text, no other words.",
+                        image
+                    ]
+                )
+                return response.text
+
+            captcha_text = await loop.run_in_executor(None, generate)
+            
+            if captcha_text:
+                captcha_text = captcha_text.strip()
+                print(f"Gemini solved captcha: '{captcha_text}'")
+                return captcha_text
+            else:
+                 print("Gemini returned empty text.")
+                 return None
+            
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "429" in error_msg or "resource_exhausted" in error_msg or "quota" in error_msg or "overloaded" in error_msg:
+                if attempt < max_retries:
+                    wait_time = base_delay * (2 ** attempt)
+                    print(f"⚠️ Gemini API Rate Limited (429). Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    print(f"❌ Gemini API Rate Limit exceeded after {max_retries} retries.")
+                    return None
+            else:
+                print(f"Error solving captcha: {e}")
+                return None
 
 async def perform_login(page, username, password, api_key, tms_url):
     """
@@ -268,8 +326,20 @@ async def perform_login(page, username, password, api_key, tms_url):
             try:
                 # Wait for a dashboard element OR the login page again (failure)
                 # Success elements: .user-avatar, .dashboard-container, app-client-dashboard
+                # Also check for specific text content to be sure it's fully loaded
                 await page.wait_for_selector("app-client-dashboard, .user-profile, .row .card", timeout=15000)
                 
+                # Secondary verify: Check for text commonly found on dashboard
+                try:
+                    await page.wait_for_selector("text=Total Turnover", timeout=5000)
+                except:
+                    # Not fatal if missing (maybe 0 turnover), but good to check
+                    pass
+
+                # --- NEW: Handle Post-Login Loading Screen ---
+                await wait_for_loading_screen_to_vanish(page)
+                # ---------------------------------------------
+
                 # Double check - sometimes we see elements but are still on login? No, wait_for_selector is safe.
                 print("[LOGIN] ✅ Login SUCCESS! (Dashboard detected)")
                 return True
@@ -380,6 +450,13 @@ async def set_toggle_position(page, action):
         
     print(f"[UTILS] Setting toggle to: {action.upper()}")
     
+    # OPTIMIZATION: Check current state BEFORE waiting for selector
+    # This avoids the ~8s wait if the toggle is already correct
+    current_state_early = await get_toggle_state(page)
+    if current_state_early == action:
+        print(f"[UTILS] Toggle already set to {action.upper()} (Pre-check)")
+        return True
+
     try:
         # Wait for toggle to be present using broad selector
         # Documentation says `app-three-state-toggle`

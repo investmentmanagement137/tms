@@ -1,37 +1,95 @@
 import asyncio
 from urllib.parse import urlparse, parse_qs
+from src.utils import wait_for_loading_screen_to_vanish
 
 async def execute(page, tms_url):
     """
     Automates order cancellation based on user provided logic.
-    1. Navigates to /tms/me/order-book-v3
     2. Cancels all OPEN orders
     3. Extracts modify URLs for PARTIALLY_TRADED orders
     """
     print("\n[DEBUG] 🚀 Starting Order Cancellation Script...")
     
-    base_url = tms_url.rstrip('/')
+    # FIX: Ensure we use the root domain, stripping /login if present
+    parsed = urlparse(tms_url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
     target_url = f"{base_url}/tms/me/order-book-v3"
     
-    print(f"[DEBUG] Navigating to Order Book: {target_url}")
-    
+    # Helper for Hybrid Navigation
+    async def navigate_to_order_book(page, url):
+        print(f"[DEBUG] Navigating to Order Book...")
+        
+        # Strategy A: Direct URL
+        try:
+            print(f"[DEBUG] Strategy A: Direct URL ({url})")
+            await page.goto(url, wait_until='domcontentloaded')
+            
+            # CRITICAL: Wait for the .preloader to vanish!
+            await wait_for_loading_screen_to_vanish(page)
+            
+            # Broader selector: kendo-grid (tag), .k-grid (class), or just any table
+            await page.wait_for_selector('kendo-grid, .k-grid, table.table', timeout=15000)
+            print("[DEBUG] ✅ Direct URL navigation successful")
+            return True
+        except Exception as e:
+            print(f"[DEBUG] ⚠️ Direct URL failed/timed out: {e}")
+            
+        print("[DEBUG] Strategy B: Button Click Fallback")
+        try:
+            # Check for "Order Management" sidebar item
+            # Expanding sidebar if needed
+            om_btn = page.locator("text=Order Management").first
+            if await om_btn.count() > 0:
+                 if await om_btn.is_visible():
+                     await om_btn.click()
+                     await page.wait_for_timeout(500)
+            
+            # Click "Order Book"
+            # Try multiple text variations
+            ob_btn = page.locator("text=Order Book").first
+            if await ob_btn.count() == 0:
+                 ob_btn = page.locator("a:has-text('Order Book')")
+            
+            if await ob_btn.count() > 0:
+                await ob_btn.click()
+                # Wait for grid
+                await page.wait_for_selector('kendo-grid, .k-grid, table.table', timeout=15000)
+                print("[DEBUG] ✅ Button Click navigation successful")
+                return True
+            else:
+                print("[DEBUG] ❌ 'Order Book' button not found")
+                
+        except Exception as e:
+             print(f"[DEBUG] ❌ Button fallback failed: {e}")
+             
+        return False
+
     result = {
         "status": "SUCCESS",
         "cancelledCount": 0,
         "partiallyTradedOrders": [],
-        "message": ""
+        "failureType": None,
+        "validationStatus": "N/A" # Cancellation doesn't use the standard validation loop yet
     }
     
     try:
-        await page.goto(target_url, wait_until='networkidle')
-        
-        # Wait for grid
-        try:
-            await page.wait_for_selector('kendo-grid', timeout=20000)
-        except:
-             print("[DEBUG] ❌ Failed to load Order Book table.")
+        # Use Hybrid Navigation Helper
+        if not await navigate_to_order_book(page, target_url):
+             print("[DEBUG] ❌ Failed to load Order Book table (All strategies exhausted).")
+             
+             # --- DEBUG CAPTURE ---
+             try:
+                 print("[DEBUG] 📸 Saving screenshot to 'order_book_fail.png'...")
+                 await page.screenshot(path="order_book_fail.png", full_page=True)
+                 with open("order_book_fail.html", "w", encoding="utf-8") as f:
+                     f.write(await page.content())
+             except Exception as dump_err:
+                 print(f"[DEBUG] Failed to save debug artifacts: {dump_err}")
+             # ---------------------
+             
              result["status"] = "FAILED"
              result["message"] = "Failed to load Order Book table"
+             result["failureType"] = "ORDER_BOOK_NAV_FAILED"
              return result
 
         # Ensure "Open" tab is selected
@@ -81,15 +139,45 @@ async def execute(page, tms_url):
         
         cancelled_count = 0
         
+        # Track attempts to prevent infinite loops on stubborn orders
+        # Signature: (status, symbol, qty, price)
+        attempt_tracker = {} 
+        MAX_RETRIES_PER_ORDER = 3
+
         while True:
             # Re-extract rows to get fresh DOM state
             current_rows = await extract_open_rows()
-            target = next((r for r in current_rows if r['status'] == 'OPEN'), None)
+            
+            # Find first OPEN order that hasn't exceeded retries
+            possible_targets = [r for r in current_rows if r['status'] == 'OPEN']
+            target = None
+            
+            for t in possible_targets:
+                 sig = f"{t['symbol']}_{t['qty']}_{t['price']}"
+                 if attempt_tracker.get(sig, 0) < MAX_RETRIES_PER_ORDER:
+                     target = t
+                     break
             
             if not target:
+                if len(possible_targets) > 0:
+                     print(f"[DEBUG] ⚠️ All {len(possible_targets)} remaining OPEN orders have reached max retries. Stopping.")
+                else:
+                     print("[DEBUG] No more OPEN orders found.")
                 break
                 
-            print(f"[DEBUG]   Cancelling: {target['symbol']} ({target['qty']} @ {target['price']})")
+            # Create a unique signature for this order instance
+            order_sig = f"{target['symbol']}_{target['qty']}_{target['price']}"
+            
+            # Check retry count
+            attempts = attempt_tracker.get(order_sig, 0)
+            if attempts >= MAX_RETRIES_PER_ORDER:
+                print(f"[DEBUG] ⚠️ Max retries reached for stubborn order: {order_sig}. Skipping/Aborting loop.")
+                result["message"] += f"Skipped stubborn order {order_sig}. "
+                break
+            
+            attempt_tracker[order_sig] = attempts + 1
+            
+            print(f"[DEBUG]   Cancelling: {target['symbol']} ({target['qty']} @ {target['price']}) - Attempt {attempts + 1}")
             
             # Locate cancel button using User's selectors
             row_idx = target['rowIndex'] + 1 # nth-child is 1-based
@@ -116,8 +204,8 @@ async def execute(page, tms_url):
 
                     # --- RELOAD to ensure fresh state ---
                     print("[DEBUG] Reloading page to refresh order list...")
-                    await page.reload(wait_until='networkidle')
-                    await page.wait_for_timeout(2000)
+                    await page.reload(wait_until='domcontentloaded')
+                    await page.wait_for_selector('kendo-grid', timeout=10000)
 
                     # Re-select 'Open' tab
                     try:
@@ -134,10 +222,17 @@ async def execute(page, tms_url):
                 else:
                     print("    ⚠️ Confirmation dialog not found or not visible")
                     result["message"] += f"Confirmation missing for {target['symbol']}. "
-                    break # Stop to avoid infinite loop
+                    
+                    # If we failed to confirm, we must reload or break to avoid staring at the same modal forever
+                    # But since we didn't confirm, the order is still there. 
+                    # We continue, which will trigger the retry limit next loop.
+                    await page.reload(wait_until='domcontentloaded') 
+                    continue
             else:
                 print("    ⚠️ Cancel button not found")
-                break # Stop to avoid infinite loop
+                # Reload to see if UI was stale
+                await page.reload(wait_until='domcontentloaded')
+                continue
                 
         result["cancelledCount"] = cancelled_count
         print(f"[DEBUG] ✅ Cancelled {cancelled_count} orders.")
@@ -187,7 +282,7 @@ async def execute(page, tms_url):
                     })
                     
                     # Navigate BACK to Order Book
-                    await page.goto(target_url, wait_until='networkidle')
+                    await page.goto(target_url, wait_until='domcontentloaded')
                     try:
                         await page.wait_for_selector('kendo-grid', timeout=10000)
                         # Switch tab again

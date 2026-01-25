@@ -2,7 +2,8 @@ import asyncio
 import re
 from urllib.parse import urlencode
 from .toast_capture import capture_all_popups, wait_for_toast, is_error_message
-from .utils import set_toggle_position, set_symbol
+from .toast_capture import capture_all_popups, wait_for_toast, is_error_message
+from .utils import set_toggle_position, set_symbol, wait_for_loading_screen_to_vanish
 
 
 def parse_order_book_row(row_text):
@@ -62,17 +63,31 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             "quantity": quantity,
             "price": price,
             "action": "SELL",
+            "quantity": quantity,
+            "price": price,
+            "action": "SELL",
             "instrument": instrument
-        }
+        },
+        "validationStatus": "UNKNOWN", # NEW: VALIDATED / NOT_VALIDATED
+        "failureType": None            # NEW: Error Code
     }
     
     try:
         # Navigate without symbol
-        await page.goto(order_url, wait_until='networkidle')
+        await page.goto(order_url, wait_until='domcontentloaded')
         # CRITICAL: Reload page to ensure fresh form state for batch orders
-        # Without this, subsequent orders in a batch may fail because goto to same URL doesn't reset form
-        await page.reload(wait_until='networkidle')
-        await page.wait_for_timeout(2000)  # Wait for Angular to fully load
+        await page.reload(wait_until='domcontentloaded')
+        # Handle preloader if present after reload
+        await wait_for_loading_screen_to_vanish(page)
+
+        try:
+            await page.wait_for_selector('app-three-state-toggle', timeout=20000)
+        except:
+             print("[DEBUG] ❌ Toggle not found even after reload")
+             result["status"] = "FAILED"
+             result["message"] = "Order form not loaded (Toggle missing)"
+             result["failureType"] = "ORDER_FORM_NOT_LOADED"
+             return result
 
         # === STEP 1: Activate SELL toggle with robust retry ===
         # Reverting to Toggle -> Instrument order to match working JS script
@@ -113,9 +128,10 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             print(f"[DEBUG] Failed to set symbol {symbol}")
             result["status"] = "FAILED"
             result["message"] = f"Failed to set symbol {symbol}"
+            result["failureType"] = "SYMBOL_SEARCH_FAILED"
             return result
         
-        await page.wait_for_timeout(1000)
+        # await page.wait_for_timeout(1000) # Removed arbitrary wait
         
         # === STEP 4: Set Quantity via JS ===
         print(f"[DEBUG] Step 4: Setting Quantity to {quantity} via JS...")
@@ -171,7 +187,7 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
         # === STEP 7: Capture Result (Check for Confirmation Dialog first) ===
         # Note: New JS snippet implies confirmation happens right after submit
         print("[DEBUG] Step 7: Checking for confirmation dialog...")
-        await page.wait_for_timeout(1000) # Allow modal to appear
+        # await page.wait_for_timeout(1000) # Removed arbitrary wait
         
         # Priority list of selectors from JS snippet
         # Key insight: Modals are usually appended to the end of the DOM, so use .last()
@@ -244,10 +260,74 @@ async def execute(page, tms_url, symbol, quantity, price, instrument="EQ"):
             
         except Exception as e:
             print(f"[DEBUG] Order book extraction failed: {e}")
+            result["failureType"] = "ORDER_BOOK_EXTRACTION_FAILED"
+            
+        # === STEP 9: Validation (Reload & Check) ===
+        
+        def check_order_in_book(book, sym, qty, prc):
+            for entry in book:
+                try:
+                    if (entry.get('symbol') == sym and 
+                        'Sell' in entry.get('side', '') and
+                        int(entry.get('quantity', 0)) == int(qty) and
+                        float(entry.get('price', 0)) == float(prc)):
+                        return True
+                except: pass
+            return False
+
+        print("[DEBUG] Validating order in Order Book...")
+        is_found = False
+        
+        # Check 1: Immediate
+        if "orderBook" in result and result["orderBook"]:
+            if check_order_in_book(result["orderBook"], symbol, quantity, price):
+                is_found = True
+                print("[DEBUG] ✅ Order found in initial Order Book check.")
+        
+        # Check 2: Reload if not found and status was SUBMITTED
+        if not is_found and result["status"] == "SUBMITTED":
+            print("[DEBUG] ⚠️ Order not found immediately. Reloading page to verify...")
+            try:
+                await page.reload(wait_until='domcontentloaded')
+                await wait_for_loading_screen_to_vanish(page)
+                
+                # Re-extract
+                # Wait for grid
+                data_rows_selector = "kendo-grid tbody tr, .k-grid tbody tr"
+                try:
+                    await page.wait_for_selector(data_rows_selector, timeout=10000)
+                except:
+                    print("[DEBUG] Timeout waiting for grid after reload")
+                
+                rows_v2 = page.locator(data_rows_selector)
+                count_v2 = await rows_v2.count()
+                book_v2 = []
+                for i in range(min(count_v2, 10)):
+                    row_txt = await rows_v2.nth(i).inner_text()
+                    if row_txt.strip() and "No records" not in row_txt:
+                        parsed = parse_order_book_row(row_txt.strip())
+                        book_v2.append(parsed)
+                
+                if check_order_in_book(book_v2, symbol, quantity, price):
+                    is_found = True
+                    print("[DEBUG] ✅ Order found after reload.")
+                else:
+                    print("[DEBUG] ❌ Order NOT found even after reload.")
+                    
+            except Exception as reload_err:
+                 print(f"[DEBUG] Error during validation reload: {reload_err}")
+
+        if is_found:
+            result["validationStatus"] = "VALIDATED"
+        else:
+            result["validationStatus"] = "NOT_VALIDATED"
+            if result["status"] == "SUBMITTED":
+                 print("[DEBUG] WARNING: Order was submitted but not validated.")
             
     except Exception as e:
         print(f"[DEBUG] Error placing order: {e}")
         result["message"] = str(e)
         result["status"] = "EXCEPTION"
+        result["failureType"] = "UNHANDLED_EXCEPTION"
         
     return result
