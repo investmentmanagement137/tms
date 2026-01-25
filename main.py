@@ -110,7 +110,7 @@ async def main():
                         # We use Client dashboard for verification now as that's our target
                         verify_url = f"{tms_url}/tms/client/dashboard"
                         # Use domcontentloaded to be faster/less brittle than networkidle
-                        await page.goto(verify_url, wait_until='domcontentloaded', timeout=30000)
+                        await page.goto(verify_url, wait_until='domcontentloaded', timeout=60000)
                         
                         # CRITICAL: Check for specific dashboard elements, not just URL
                         # SPA might show login form while URL remains /dashboard

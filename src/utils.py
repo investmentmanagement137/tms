@@ -71,7 +71,25 @@ async def solve_captcha(page, api_key):
                 return None
             
             print("Capturing captcha screenshot...")
+            
+            # Ensure image is genuinely loaded (has dimensions)
+            try:
+                await page.wait_for_function(
+                    "document.querySelector('img.captcha-image-dimension').naturalWidth > 0",
+                    timeout=5000
+                )
+            except:
+                print("⚠️ Captcha image has 0 width (not loaded properly).")
+                
+            # Small buffer for rendering
+            await page.wait_for_timeout(2000)
+            
             screenshot_bytes = await captcha_loc.screenshot()
+            
+            if len(screenshot_bytes) < 500:
+                print(f"⚠️ Captcha screenshot is suspiciously small ({len(screenshot_bytes)} bytes). Retrying...")
+                continue
+                
             image = Image.open(io.BytesIO(screenshot_bytes))
             
             print("Sending to Gemini API...")
@@ -115,6 +133,9 @@ async def solve_captcha(page, api_key):
             else:
                 print(f"Error solving captcha: {e}")
                 return None
+                
+    print("[UTILS] Captcha solving exhausted all retries.")
+    return None
 
 async def perform_login(page, username, password, api_key, tms_url):
     """
@@ -149,9 +170,9 @@ async def perform_login(page, username, password, api_key, tms_url):
             
             # Try multiple navigation strategies
             nav_strategies = [
-                ('domcontentloaded', 30000), 
-                ('load', 60000),
-                ('commit', 30000),
+                ('domcontentloaded', 60000), 
+                ('load', 90000),
+                ('commit', 60000),
             ]
             
             for wait_until, timeout in nav_strategies:
